@@ -1,0 +1,93 @@
+{
+  "ss": {
+    "min": 1480,
+    "max": 1540,
+    "colorscale": "Viridis",
+    "color_min": null,
+    "color_max": null
+  },
+  "temp": {
+    "min": 0,
+    "max": 35,
+    "colorscale": "RdYlBu_r",
+    "color_min": null,
+    "color_max": null
+  },
+  "salt": {
+    "min": 30,
+    "max": 35,
+    "colorscale": "Blues",
+    "color_min": null,
+    "color_max": null
+  },
+  "uo": {
+    "min": -1.5,
+    "max": 1.5,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null
+  },
+  "vo": {
+    "min": -1.5,
+    "max": 1.5,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null
+  },
+  "uv": {
+    "min": -2,
+    "max": 2,
+    "colorscale": "Blues",
+    "color_min": null,
+    "color_max": null
+  },
+  "u10": {
+    "min": -15,
+    "max": 15,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null
+  },
+  "v10": {
+    "min": -15,
+    "max": 15,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null
+  },
+  "wind": {
+    "min": 0,
+    "max": 20,
+    "colorscale": "YlOrRd",
+    "color_min": null,
+    "color_max": null
+  },
+  "swh": {
+    "min": 0,
+    "max": 6,
+    "colorscale": "Blues",
+    "color_min": null,
+    "color_max": null
+  },
+  "mwd_u": {
+    "min": -1,
+    "max": 1,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null
+  },
+  "mwd_v": {
+    "min": -1,
+    "max": 1,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null
+  },
+  "mwd": {
+    "min": 0,
+    "max": 1,
+    "colorscale": "Viridis",
+    "color_min": null,
+    "color_max": null
+  }
+}

@@ -1,0 +1,3 @@
+*.nc
+/autoregressive_results
+/docs
