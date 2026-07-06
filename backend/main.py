@@ -340,8 +340,11 @@ def get_layer(depth_idx: int,
 
     quiver_uv = (u_surf, v_surf, step) if (variable in VARS_VECTOR and v_surf is not None) else None
 
-    # For vector variables, pass magnitude as the heatmap data
-    if variable in VARS_VECTOR and v_surf is not None:
+    # For vector variables: mwd shows direction angle as heatmap; others show magnitude
+    if variable == "mwd" and v_surf is not None:
+        import numpy as np
+        heatmap_data = (np.degrees(np.arctan2(u_surf, v_surf)) + 360) % 360
+    elif variable in VARS_VECTOR and v_surf is not None:
         import numpy as np
         heatmap_data = np.sqrt(u_surf**2 + v_surf**2)
     elif is_2d:

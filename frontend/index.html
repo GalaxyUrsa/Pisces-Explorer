@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ocean Sound Speed 3D</title>
   <link rel="stylesheet" href="/static/style.css?v=8" />
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="/static/plotly.min.js?v=6.7.0"></script>
 </head>
 <body>
 
@@ -153,15 +153,15 @@
                 </button>
                 <button class="var-card" data-var="mwd">
                   <div class="var-icon">🧭</div>
-                  <div class="var-info"><div class="var-name">波向（合成）</div></div>
-                  <div class="var-unit"></div>
+                  <div class="var-info"><div class="var-name">波向</div></div>
+                  <div class="var-unit">°</div>
                 </button>
-                <button class="var-card" data-var="mwd_u">
+                <button class="var-card" data-var="mwd_u" style="display:none">
                   <div class="var-icon">→</div>
                   <div class="var-info"><div class="var-name">波向 u</div></div>
                   <div class="var-unit"></div>
                 </button>
-                <button class="var-card" data-var="mwd_v">
+                <button class="var-card" data-var="mwd_v" style="display:none">
                   <div class="var-icon">↑</div>
                   <div class="var-info"><div class="var-name">波向 v</div></div>
                   <div class="var-unit"></div>

@@ -44,7 +44,7 @@ VAR_META = {
     "swh":   dict(label="有效波高", unit="m",   colorscale="Blues",    line_color="#74b9ff", vmin=0,    vmax=6),
     "mwd_u": dict(label="波向u",   unit="",     colorscale="RdBu_r",   line_color="#55efc4", vmin=-1,   vmax=1),
     "mwd_v": dict(label="波向v",   unit="",     colorscale="RdBu_r",   line_color="#55efc4", vmin=-1,   vmax=1),
-    "mwd":   dict(label="波向",    unit="",     colorscale="Viridis",  line_color="#55efc4", vmin=0,    vmax=1),
+    "mwd":   dict(label="波向",    unit="°",    colorscale="HSV",      line_color="#55efc4", vmin=0,    vmax=360),
 }
 
 def _nan_colorscale(name_or_list, vmin: float, vmax: float):

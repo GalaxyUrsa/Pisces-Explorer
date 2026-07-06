@@ -28,7 +28,7 @@ DEFAULTS: dict = {
     "swh":   {"min": 0,    "max": 6,    "colorscale": "Blues",    "color_min": None, "color_max": None},
     "mwd_u": {"min": -1,   "max": 1,    "colorscale": "RdBu_r",   "color_min": None, "color_max": None},
     "mwd_v": {"min": -1,   "max": 1,    "colorscale": "RdBu_r",   "color_min": None, "color_max": None},
-    "mwd":   {"min": 0,    "max": 1,    "colorscale": "Viridis",  "color_min": None, "color_max": None},
+    "mwd":   {"min": 0,    "max": 360,  "colorscale": "HSV",      "color_min": None, "color_max": None},
 }
 
 

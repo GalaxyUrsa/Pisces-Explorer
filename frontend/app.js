@@ -39,7 +39,7 @@ const VAR_UNITS = {
   uo: "m/s", vo: "m/s", uv: "m/s",
   u10: "m/s", v10: "m/s", wind: "m/s",
   swh: "m",
-  mwd_u: "", mwd_v: "", mwd: "",
+  mwd_u: "", mwd_v: "", mwd: "°",
 };
 
 const VAR_DEFAULTS = {
@@ -55,7 +55,7 @@ const VAR_DEFAULTS = {
   swh:   { min: 0,    max: 6,    colorscale: "Blues"    },
   mwd_u: { min: -1,   max: 1,    colorscale: "RdBu_r"   },
   mwd_v: { min: -1,   max: 1,    colorscale: "RdBu_r"   },
-  mwd:   { min: 0,    max: 1,    colorscale: "Viridis"  },
+  mwd:   { min: 0,    max: 360,  colorscale: "HSV"     },
 };
 
 const COLORSCALES = [
@@ -63,6 +63,7 @@ const COLORSCALES = [
   "RdYlBu_r", "RdBu_r", "Spectral_r",
   "Blues", "Greens", "YlOrRd",
   "Jet", "Turbo", "Rainbow",
+  "HSV",
 ];
 
 const PLOTLY_CONFIG = {

@@ -85,8 +85,8 @@
   },
   "mwd": {
     "min": 0,
-    "max": 1,
-    "colorscale": "Viridis",
+    "max": 360,
+    "colorscale": "Spectral_r",
     "color_min": null,
     "color_max": null
   }
