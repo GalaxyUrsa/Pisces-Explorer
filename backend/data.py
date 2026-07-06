@@ -32,7 +32,8 @@ def sound_speed_chen_millero(T, S, z):
     )
     B = -1.922e-2 - 4.42e-5 * T + P * 7.3637e-5 + P * T * 1.7950e-7
     D = 1.727e-3 - 7.9836e-6 * P
-    return Cw + A * S + B * S**1.5 + D * S**2
+    S_nn = np.where(S >= 0, S, np.nan)  # S**1.5 is undefined for negative S
+    return Cw + A * S_nn + B * S_nn**1.5 + D * S_nn**2
 
 
 DEPTHS = np.array([

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ocean Sound Speed 3D</title>
+  <title>Pisces-Explorer</title>
   <link rel="stylesheet" href="/static/style.css?v=8" />
   <script src="/static/plotly.min.js?v=6.7.0"></script>
 </head>
@@ -13,7 +13,7 @@
   <div id="upload-screen" class="upload-screen">
     <div class="upload-card">
       <div class="upload-icon">🌊</div>
-      <h1 class="gradient-title" style="font-size:1.8em;margin-bottom:8px">Ocean Sound Speed</h1>
+      <h1 class="gradient-title" style="font-size:1.8em;margin-bottom:8px">Pisces-Explorer</h1>
       <p class="upload-hint">选择加载模式</p>
 
       <div style="display:flex;gap:12px;margin-bottom:16px">
@@ -49,7 +49,7 @@
       <div class="sidebar">
 
         <div class="side-card" style="padding:12px 14px">
-          <h1 class="gradient-title" style="font-size:1.1em;margin-bottom:4px">🌊 Ocean Sound Speed</h1>
+          <h1 class="gradient-title" style="font-size:1.1em;margin-bottom:4px">🌊 Pisces-Explorer</h1>
           <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
             <span id="loaded-filename" class="loaded-filename" style="flex:1;font-size:0.78em"></span>
             <button id="reload-btn" class="reload-btn">↩ 重新选择</button>
@@ -179,6 +179,11 @@
             <input type="number" class="range-input" id="cmax" placeholder="max" />
             <button class="range-btn" id="cbar-apply">应用</button>
           </div>
+          <div class="dual-range-wrap" id="cbar-dual-wrap">
+            <div class="dual-range-track"><div class="dual-range-fill" id="cbar-dual-fill"></div></div>
+            <div class="dual-range-thumb" id="cbar-thumb-min"></div>
+            <div class="dual-range-thumb" id="cbar-thumb-max"></div>
+          </div>
           <div class="cbar-colorscale-row">
             <span class="range-label">预设</span>
             <select id="colorscale-select" class="colorscale-select"></select>
@@ -198,7 +203,7 @@
           <div id="quiver-density-row" class="hidden" style="margin-top:10px">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="range-label">矢量密度</span>
-              <input type="range" id="quiver-step" min="5" max="40" value="20" class="depth-slider" style="flex:1" />
+              <input type="range" id="quiver-step" min="10" max="40" value="20" class="depth-slider" style="flex:1" />
               <span class="range-label" id="quiver-step-label">步长 20</span>
             </div>
           </div>
@@ -218,6 +223,11 @@
             <button id="play-btn" class="play-btn">▶ 播放</button>
             <span id="play-status" class="play-status"></span>
           </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <span class="range-label">间隔</span>
+            <input type="number" id="play-interval" min="1" max="60" value="3" step="1" class="range-input" style="width:4.5ch" />
+            <span class="range-label">s</span>
+          </div>
         </div>
 
         <div class="side-card">
@@ -229,6 +239,23 @@
           </div>
           <div class="depth-slider-wrap">
             <input type="range" class="depth-slider" id="depth-slider" min="0" max="19" value="0" />
+          </div>
+
+          <!-- 3D 显示层选择 -->
+          <div class="var-group" style="margin-top:10px" id="layer-vis-group">
+            <div class="var-group-header" data-group="layer-vis">
+              <span class="var-group-arrow">▶</span>
+              <span>3D 显示层</span>
+            </div>
+            <div class="var-group-body hidden" id="var-group-layer-vis">
+              <div style="display:flex;gap:6px;margin-bottom:8px">
+                <button class="range-btn" id="layer-vis-all">全选</button>
+                <button class="range-btn" id="layer-vis-none">全不选</button>
+                <button class="range-btn" id="layer-vis-even">隔层</button>
+                <button class="range-btn" style="margin-left:auto" id="layer-vis-apply">应用</button>
+              </div>
+              <div id="layer-vis-checks" style="display:flex;flex-direction:column;gap:4px;min-height:80px;max-height:400px;height:200px;overflow-y:auto;resize:vertical"></div>
+            </div>
           </div>
         </div>
 
@@ -265,6 +292,7 @@
           <div class="panel panel-3d" id="panel-3d">
             <div class="panel-header">
               <span class="panel-hint" id="vol-panel-title">3D 声速场</span>
+              <span class="loading-indicator hidden" id="vol-loading">计算中…</span>
             </div>
             <div id="vol-graph" class="graph-container"></div>
           </div>
@@ -273,6 +301,7 @@
             <div class="panel-header">
               <span id="layer-panel-title" class="panel-title"></span>
               <span class="panel-hint"> · 点击地图选点</span>
+              <span class="loading-indicator hidden" id="layer-loading">计算中…</span>
             </div>
             <div id="layer-map-graph" class="graph-container"></div>
           </div>
@@ -281,21 +310,31 @@
         <div class="row-resizer" id="row-resizer"></div>
         <div class="panel panel-profile">
           <div class="profile-header">
-            <div id="profile-panel-title" class="panel-hint"></div>
-            <div class="range-controls">
+            <span id="profile-panel-title" class="panel-hint"></span>
+            <span class="loading-indicator hidden" id="profile-loading" style="margin-left:8px">计算中…</span>
+            <div class="range-controls" style="margin-left:auto">
               <span class="range-label">深度</span>
               <input type="number" id="depth-min" class="range-input" placeholder="min" step="10" />
               <span class="range-sep">–</span>
               <input type="number" id="depth-max" class="range-input" placeholder="max" step="10" />
               <span class="range-unit">m</span>
-              <span class="range-divider"></span>
+              <div class="dual-range-wrap" id="depth-dual-wrap" style="flex:1;min-width:60px;margin:0 4px">
+                <div class="dual-range-track"><div class="dual-range-fill" id="depth-dual-fill"></div></div>
+                <div class="dual-range-thumb" id="depth-thumb-min"></div>
+                <div class="dual-range-thumb" id="depth-thumb-max"></div>
+              </div>
+              <span class="range-divider" id="value-range-divider"></span>
               <span class="range-label" id="value-range-label">值</span>
               <input type="number" id="speed-min" class="range-input" placeholder="min" step="1" />
-              <span class="range-sep">–</span>
+              <span class="range-sep" id="value-range-sep">–</span>
               <input type="number" id="speed-max" class="range-input" placeholder="max" step="1" />
               <span class="range-unit" id="value-range-unit">m/s</span>
+              <div class="dual-range-wrap" id="value-dual-wrap" style="flex:1;min-width:60px;margin:0 4px">
+                <div class="dual-range-track"><div class="dual-range-fill" id="value-dual-fill"></div></div>
+                <div class="dual-range-thumb" id="value-thumb-min"></div>
+                <div class="dual-range-thumb" id="value-thumb-max"></div>
+              </div>
               <button id="range-apply-btn" class="range-btn">应用</button>
-              <button id="range-reset-btn" class="range-btn range-btn-ghost">重置</button>
             </div>
           </div>
           <div id="profile-graph" class="graph-container"></div>

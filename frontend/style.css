@@ -97,7 +97,7 @@ body {
 
 /* ========== 左侧边栏 ========== */
 .sidebar {
-  width: 350px;
+  width: 22vw;
   min-width: 180px;
   display: flex;
   flex-direction: column;
@@ -314,7 +314,7 @@ body {
   flex-direction: column;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-.panel-3d  { width: 50%; min-width: 300px; }
+.panel-3d  { width: 50%; min-width: 30%; }
 .panel-map { flex: 1; min-width: 0; }
 
 .resizer {
@@ -358,7 +358,7 @@ body {
   gap: 4px;
   flex-wrap: wrap;
 }
-.cbar-range-sidebar .range-input { width: 68px; }
+.cbar-range-sidebar .range-input { width: 9ch; }
 
 .cbar-colorscale-row {
   display: flex;
@@ -432,7 +432,7 @@ body {
 .color-swatch::-webkit-color-swatch { border: none; border-radius: 2px; }
 
 .color-hex {
-  width: 72px;
+  width: 7.5ch;
   padding: 4px 6px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
@@ -445,7 +445,7 @@ body {
 .color-hex:focus { border-color: #3b82f6; outline: none; }
 
 .range-input {
-  width: 56px;
+  width: 9ch;
   padding: 4px 6px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
@@ -514,6 +514,7 @@ body {
   align-items: center;
   gap: 6px;
   margin-left: auto;
+  flex: 1;
 }
 .range-label   { font-size: 0.75em; color: #64748b; }
 .range-unit    { font-size: 0.7em; color: #94a3b8; }
@@ -573,7 +574,69 @@ body {
 }
 .upload-mode-btn:hover:not(.active) { background: #e2e8f0; }
 
-/* ========== 时间轴播放控件 ========== */
+/* ========== 双端滑块 ========== */
+.dual-range-wrap {
+  position: relative;
+  height: 20px;
+  margin: 8px 0 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.dual-range-track {
+  position: absolute;
+  top: 8px;
+  left: 0; right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: #e2e8f0;
+  pointer-events: none;
+}
+.dual-range-fill {
+  position: absolute;
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 2px;
+}
+.dual-range-thumb {
+  position: absolute;
+  top: 3px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transform: translateX(-50%);
+  cursor: grab;
+  z-index: 2;
+}
+.dual-range-thumb:active { cursor: grabbing; background: #2563eb; }
+
+/* ========== Loading 指示器 ========== */
+.loading-indicator {
+  font-size: 0.75em;
+  color: #3b82f6;
+  margin-left: auto;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ========== 3D 层可见性 checkboxes ========== */
+.layer-check-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78em;
+  color: #334155;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.layer-check-item:hover { background: #f1f5f9; }
+.layer-check-item input[type="checkbox"] { accent-color: #3b82f6; cursor: pointer; }
+
 .timeline-controls {
   display: flex;
   align-items: center;

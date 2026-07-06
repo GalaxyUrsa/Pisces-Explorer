@@ -1,13 +1,43 @@
-# Ocean Sound Speed Viz
+# Pisces-Explorer
+
+**v1.1**
 
 基于 FastAPI + Plotly 的海洋多变量交互式可视化工具，支持声速、温度、盐度、流速、风场、波浪等变量的三维体渲染与水平切片分析。
 
 ---
 
+## 更新日志
+
+### v1.1（2026-07-06）
+
+**新功能**
+- 3D 显示层选择：可在深度层卡片中勾选任意层参与 3D 渲染，支持全选 / 全不选 / 隔层快捷操作，配置持久化
+- 时间序列播放：加载多帧数据后出现时间轴面板，支持逐帧自动播放，播放间隔可调
+- 页面刷新后自动恢复上次选择的变量
+
+**改进**
+- 矢量箭头（流速 / 风速 / 波向）全部向量化重写，渲染性能大幅提升；箭头长度随量值比例缩放
+- 波向（mwd）改为显示实际角度（0–360°）而非模长，色标方案改为 HSV
+
+**修复**
+- 3D 点击层与 2D 显示层错位：部分层显示时 curveNumber 与深度索引不对应，导致点击 3D 层后 2D 切片跳到错误层
+- 色标滑块拇指位置错误：初始化时拇指落在数据实际范围端点而非已保存的显示范围
+- 合成波向箭头消失：mwd 移出矢量变量分类后箭头逻辑失效，已通过独立路径恢复
+- 盐度存在负值时声速计算触发 RuntimeWarning（`S**1.5` 对负数无效）
+
+### v1.0（初始版本）
+
+- 首次发布，支持 3D 体渲染、水平切片、单点剖面、两点断面
+- 支持声速、温度、盐度、东向 / 北向流速、风速、有效波高、波向变量
+- 色标范围 / 配色方案可调并持久化
+- 支持拖拽分隔条调整面板比例
+
+---
+
 ## 功能概览
 
-- **3D 体渲染**：多深度层叠加的三维立体显示
-- **水平切片**：任意深度层的水平分布热力图，支持流速 / 风场矢量箭头叠加
+- **3D 体渲染**：多深度层叠加的三维立体显示，可自由选择参与渲染的深度层
+- **水平切片**：任意深度层的水平分布热力图，支持流速 / 风场 / 波向矢量箭头叠加
 - **垂直剖面**：点击地图查看任意位置的深度剖面曲线
 - **垂直断面**：两点连线的剖面截面图
 - **时间序列**：多帧数据按时间轴播放动画
@@ -92,7 +122,7 @@ python run.py --debug
 
 ### 深度层
 
-下拉菜单或滑块选择当前显示的深度层，水平切片和剖面图同步更新。
+下拉菜单或滑块选择当前显示的深度层，水平切片和剖面图同步更新。**3D 显示层**子面板可单独控制哪些深度层参与体渲染。
 
 ### 交互模式
 
@@ -101,7 +131,7 @@ python run.py --debug
 
 ### 时间序列播放
 
-上传序列数据后，出现时间轴面板，可手动切换或点击「▶ 播放」自动逐帧播放（3 秒/帧）。
+上传序列数据后，出现时间轴面板，可手动切换或点击「▶ 播放」自动逐帧播放，间隔时间可在输入框中设置（秒）。
 
 ### 色标配置
 
@@ -114,13 +144,13 @@ python run.py --debug
 Windows 下可打包为无需 Python 环境的单文件 `.exe`：
 
 ```bash
-pyinstaller --onefile --name SoundSpeedViz --add-data "frontend;frontend" run.py
+pyinstaller --onefile --name PiscesExplorer --add-data "frontend;frontend" run.py
 ```
 
 macOS / Linux：
 
 ```bash
-pyinstaller --onefile --name SoundSpeedViz --add-data "frontend:frontend" run.py
+pyinstaller --onefile --name PiscesExplorer --add-data "frontend:frontend" run.py
 ```
 
 ---
@@ -128,7 +158,7 @@ pyinstaller --onefile --name SoundSpeedViz --add-data "frontend:frontend" run.py
 ## 项目结构
 
 ```
-sound_speed_viz_v1/
+Pisces-Explorer/
 ├── run.py                 # 入口，CLI 参数解析
 ├── backend/
 │   ├── main.py            # FastAPI 应用，API 路由

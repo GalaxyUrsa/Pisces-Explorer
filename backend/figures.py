@@ -86,7 +86,7 @@ def _var_meta(variable: str) -> dict:
 # Shared style helpers
 # ---------------------------------------------------------------------------
 
-def _colorbar_style(unit: str = "m/s"):
+def _colorbar_style(unit: str = "m/s", len: float = 0.8):
     return dict(
         title=dict(text=unit, font=dict(color="#334155", size=11), side="top"),
         tickfont=dict(color="#64748b", size=10),
@@ -95,7 +95,7 @@ def _colorbar_style(unit: str = "m/s"):
         orientation="v",
         x=1.01, xanchor="left",
         y=0.5,  yanchor="middle",
-        len=0.8,
+        len=len,
         thickness=12,
     )
 
@@ -131,7 +131,8 @@ def _empty_fig(msg: str) -> dict:
 def make_volume_fig(data, lats, lons, depths, variable: str = "ss",
                     vmin: float = None, vmax: float = None,
                     colorscale: str = None,
-                    colorscale_custom: list = None) -> dict:
+                    colorscale_custom: list = None,
+                    depth_indices: list = None) -> dict:
     meta    = _var_meta(variable)
     n_depth = len(depths)
     vmin    = vmin if vmin is not None else float(np.nanmin(data))
@@ -140,6 +141,14 @@ def make_volume_fig(data, lats, lons, depths, variable: str = "ss",
         cs_input = [[0.0, colorscale_custom[0]], [1.0, colorscale_custom[1]]]
     else:
         cs_input = colorscale if colorscale else meta["colorscale"]
+
+    # Default: every other layer (half density)
+    if depth_indices is None:
+        depth_indices = list(range(0, n_depth, 2))
+    else:
+        depth_indices = [i for i in depth_indices if 0 <= i < n_depth]
+    if not depth_indices:
+        depth_indices = [0]
 
     STEP3D   = 8
     data_ds  = data[:, ::STEP3D, ::STEP3D]
@@ -152,7 +161,7 @@ def make_volume_fig(data, lats, lons, depths, variable: str = "ss",
     cs, sentinel = _nan_colorscale(cs_input, vmin, vmax)
 
     fig = go.Figure()
-    for i in range(n_depth):
+    for i in depth_indices:
         layer   = data_ds[i]
         d_label = f"{depths[i]:.1f} m"
         nan_mask = np.isnan(layer)
@@ -161,18 +170,16 @@ def make_volume_fig(data, lats, lons, depths, variable: str = "ss",
         fig.add_trace(go.Surface(
             x=LON, y=LAT, z=Z_flat,
             surfacecolor=layer_plot,
-            customdata=np.stack([LAT, LON, layer], axis=-1),
             hovertemplate=(
-                "Lon: %{customdata[1]:.2f}°E  Lat: %{customdata[0]:.2f}°N<br>"
-                f"Depth: {d_label}<br>"
-                f"Val: " + "%{customdata[2]:.2f} " + meta["unit"] +
+                "Lon: %{x:.6f}°E  Lat: %{y:.6f}°N<br>"
+                f"Depth: {d_label}"
                 "<extra></extra>"
             ),
             colorscale=cs,
             cmin=sentinel,
             cmax=vmax,
-            showscale=(i == 0),
-            colorbar=_colorbar_style(meta["unit"]) if i == 0 else None,
+            showscale=(i == depth_indices[0]),
+            colorbar=_colorbar_style(meta["unit"]) if i == depth_indices[0] else None,
             opacity=0.85,
             name=d_label,
         ))
@@ -212,75 +219,61 @@ def make_volume_fig(data, lats, lons, depths, variable: str = "ss",
 # Quiver (vector arrow) trace
 # ---------------------------------------------------------------------------
 
-def make_quiver_trace(u, v, lats, lons, step: int = 20):
-    """Build arrow traces overlaid on a Heatmap.
-
-    Uses Plotly's cone-style arrow: a short line segment for the shaft and a
-    filled triangle marker at the tip for the head.  Arrows are normalized so
-    the longest vector fills one downsampled grid cell.
-    """
+def make_quiver_trace(u, v, lats, lons, step: int = 20, scale_factor: float = 0.4):
+    """Build arrow traces overlaid on a Heatmap (vectorized)."""
     lats_ds = lats[::step]
     lons_ds = lons[::step]
     u_ds = u[::step, ::step]
     v_ds = v[::step, ::step]
 
-    # Spacing of the downsampled grid — arrow length relative to this
     dlat = float(abs(lats_ds[1] - lats_ds[0])) if len(lats_ds) > 1 else 1.0
     dlon = float(abs(lons_ds[1] - lons_ds[0])) if len(lons_ds) > 1 else 1.0
-    scale = min(dlat, dlon) * 0.75  # arrow fills ~75% of a cell at max magnitude
+    scale = min(dlat, dlon) * scale_factor
 
     mag = np.sqrt(u_ds**2 + v_ds**2)
     max_mag = float(np.nanmax(mag))
     if max_mag == 0 or np.isnan(max_mag):
         return None
 
-    # Shaft: lines from tail to head, separated by None
-    shaft_x, shaft_y = [], []
-    # Head: arrow-tip markers at the head point
-    head_x, head_y, head_angle = [], [], []
+    LON_DS, LAT_DS = np.meshgrid(lons_ds, lats_ds)
 
-    nr, nc = u_ds.shape
-    for r in range(nr):
-        for c in range(nc):
-            um = float(u_ds[r, c])
-            vm = float(v_ds[r, c])
-            if np.isnan(um) or np.isnan(vm):
-                continue
-            m = np.sqrt(um**2 + vm**2)
-            if m == 0:
-                continue
-            lon0 = float(lons_ds[c])
-            lat0 = float(lats_ds[r])
-            frac = m / max_mag
-            dlon_v = (um / m) * scale * frac
-            dlat_v = (vm / m) * scale * frac
-            lon1 = lon0 + dlon_v
-            lat1 = lat0 + dlat_v
-            shaft_x += [lon0, lon1, None]
-            shaft_y += [lat0, lat1, None]
-            head_x.append(lon1)
-            head_y.append(lat1)
-            # Plotly arrow symbol: 0° = pointing up (north), clockwise positive
-            # Math angle: 0° = east, CCW positive → convert: plotly_angle = 90 - math_angle
-            math_deg = float(np.degrees(np.arctan2(dlat_v, dlon_v)))
-            plotly_angle = 90.0 - math_deg
-            head_angle.append(plotly_angle)
+    # 过滤有效点
+    valid = ~(np.isnan(u_ds) | np.isnan(v_ds) | (mag == 0))
+    lon0 = LON_DS[valid]
+    lat0 = LAT_DS[valid]
+    um   = u_ds[valid]
+    vm   = v_ds[valid]
+    m    = mag[valid]
+
+    frac    = 0.2 + 0.8 * (m / max_mag)
+    dlon_v  = (um / m) * scale * frac
+    dlat_v  = (vm / m) * scale * frac
+    lon1    = lon0 + dlon_v
+    lat1    = lat0 + dlat_v
+
+    # shaft: [tail, head, None] per arrow — interleave via reshape
+    nan_col = np.full(len(lon0), np.nan)
+    shaft_x = np.stack([lon0, lon1, nan_col], axis=1).ravel()
+    shaft_y = np.stack([lat0, lat1, nan_col], axis=1).ravel()
+
+    math_deg    = np.degrees(np.arctan2(dlat_v, dlon_v))
+    head_angle  = 90.0 - math_deg
 
     shaft_trace = go.Scattergl(
         x=shaft_x, y=shaft_y,
         mode="lines",
-        line=dict(color="rgba(20,20,20,0.55)", width=1.2),
+        line=dict(color="rgba(20,20,20,0.7)", width=2),
         showlegend=False,
         hoverinfo="skip",
     )
     head_trace = go.Scattergl(
-        x=head_x, y=head_y,
+        x=lon1.tolist(), y=lat1.tolist(),
         mode="markers",
         marker=dict(
             symbol="arrow",
-            size=7,
+            size=10,
             angle=head_angle,
-            color="rgba(20,20,20,0.75)",
+            color="rgba(20,20,20,0.85)",
             line=dict(width=0),
         ),
         showlegend=False,
@@ -339,7 +332,8 @@ def make_layer_fig(data, lats, lons, depths, depth_idx: int, points: list,
     # u_arr and v_arr from quiver_uv are already 2D slices (prepared by caller)
     if quiver_uv is not None:
         u_arr, v_arr, step = quiver_uv
-        result = make_quiver_trace(u_arr, v_arr, lats, lons, step)
+        sf = 0.8 if variable == "uv" else 0.4
+        result = make_quiver_trace(u_arr, v_arr, lats, lons, step, scale_factor=sf)
         if result is not None:
             shaft_trace, head_trace = result
             fig.add_trace(shaft_trace)
@@ -462,7 +456,7 @@ def make_transect_fig(data, lats, lons, depths, p1: dict, p2: dict,
         x=dist_km, y=depths, z=section,
         colorscale=meta["colorscale"], zmin=zmin, zmax=zmax,
         ncontours=30, contours_coloring="fill",
-        colorbar=_colorbar_style(meta["unit"]),
+        colorbar=_colorbar_style(meta["unit"], len=1.0),
         hovertemplate=f"距离: " + "%{x:.1f} km<br>深度: %{y:.1f} m<br>" + f"{meta['label']}: " + "%{z:.2f} " + meta["unit"] + "<extra></extra>",
     ))
     fig.add_hline(
