@@ -16,19 +16,19 @@ def _app_dir() -> str:
 CONFIG_PATH = os.path.join(_app_dir(), "temp", "viz_config.json")
 
 DEFAULTS: dict = {
-    "ss":    {"min": 1480, "max": 1560, "colorscale": "Viridis",  "color_min": None, "color_max": None},
-    "temp":  {"min": 0,    "max": 35,   "colorscale": "RdYlBu_r", "color_min": None, "color_max": None},
-    "salt":  {"min": 30,   "max": 40,   "colorscale": "Blues",    "color_min": None, "color_max": None},
-    "uo":    {"min": -1.5, "max": 1.5,  "colorscale": "RdBu_r",   "color_min": None, "color_max": None},
-    "vo":    {"min": -1.5, "max": 1.5,  "colorscale": "RdBu_r",   "color_min": None, "color_max": None},
-    "uv":    {"min": 0,    "max": 2,    "colorscale": "Viridis",  "color_min": None, "color_max": None},
-    "u10":   {"min": -15,  "max": 15,   "colorscale": "RdBu_r",   "color_min": None, "color_max": None},
-    "v10":   {"min": -15,  "max": 15,   "colorscale": "RdBu_r",   "color_min": None, "color_max": None},
-    "wind":  {"min": 0,    "max": 20,   "colorscale": "YlOrRd",   "color_min": None, "color_max": None},
-    "swh":   {"min": 0,    "max": 6,    "colorscale": "Blues",    "color_min": None, "color_max": None},
-    "mwd_u": {"min": -1,   "max": 1,    "colorscale": "RdBu_r",   "color_min": None, "color_max": None},
-    "mwd_v": {"min": -1,   "max": 1,    "colorscale": "RdBu_r",   "color_min": None, "color_max": None},
-    "mwd":   {"min": 0,    "max": 360,  "colorscale": "HSV",      "color_min": None, "color_max": None},
+    "ss":    {"min": 1480, "max": 1560, "colorscale": "Viridis",  "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "temp":  {"min": 0,    "max": 35,   "colorscale": "RdYlBu_r", "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "salt":  {"min": 30,   "max": 40,   "colorscale": "Blues",    "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "uo":    {"min": -1.5, "max": 1.5,  "colorscale": "RdBu_r",   "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "vo":    {"min": -1.5, "max": 1.5,  "colorscale": "RdBu_r",   "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "uv":    {"min": 0,    "max": 2,    "colorscale": "Viridis",  "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "u10":   {"min": -15,  "max": 15,   "colorscale": "RdBu_r",   "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "v10":   {"min": -15,  "max": 15,   "colorscale": "RdBu_r",   "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "wind":  {"min": 0,    "max": 20,   "colorscale": "YlOrRd",   "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "swh":   {"min": 0,    "max": 6,    "colorscale": "Blues",    "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "mwd_u": {"min": -1,   "max": 1,    "colorscale": "RdBu_r",   "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "mwd_v": {"min": -1,   "max": 1,    "colorscale": "RdBu_r",   "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
+    "mwd":   {"min": 0,    "max": 1,    "colorscale": "Viridis",  "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
 }
 
 
@@ -41,6 +41,8 @@ def load_config() -> dict:
         for var, defaults in DEFAULTS.items():
             entry = saved.get(var, {})
             result[var] = {**defaults, **{k: v for k, v in entry.items() if k in defaults}}
+        if "visible_layers" in saved:
+            result["visible_layers"] = saved["visible_layers"]
         return result
     except Exception:
         return {v: dict(d) for v, d in DEFAULTS.items()}

@@ -1,5 +1,5 @@
 /**
- * Ocean Sound Speed — frontend logic
+ * Pisces-Explorer — frontend logic
  */
 
 const state = {
@@ -39,31 +39,30 @@ const VAR_UNITS = {
   uo: "m/s", vo: "m/s", uv: "m/s",
   u10: "m/s", v10: "m/s", wind: "m/s",
   swh: "m",
-  mwd_u: "", mwd_v: "", mwd: "°",
+  mwd_u: "", mwd_v: "", mwd: "",
 };
 
 const VAR_DEFAULTS = {
-  ss:    { min: 1480, max: 1560, colorscale: "Viridis"  },
-  temp:  { min: 0,    max: 35,   colorscale: "RdYlBu_r" },
-  salt:  { min: 30,   max: 40,   colorscale: "Blues"    },
-  uo:    { min: -1.5, max: 1.5,  colorscale: "RdBu_r"   },
-  vo:    { min: -1.5, max: 1.5,  colorscale: "RdBu_r"   },
-  uv:    { min: 0,    max: 2,    colorscale: "Viridis"  },
-  u10:   { min: -15,  max: 15,   colorscale: "RdBu_r"   },
-  v10:   { min: -15,  max: 15,   colorscale: "RdBu_r"   },
-  wind:  { min: 0,    max: 20,   colorscale: "YlOrRd"   },
-  swh:   { min: 0,    max: 6,    colorscale: "Blues"    },
-  mwd_u: { min: -1,   max: 1,    colorscale: "RdBu_r"   },
-  mwd_v: { min: -1,   max: 1,    colorscale: "RdBu_r"   },
-  mwd:   { min: 0,    max: 360,  colorscale: "HSV"     },
+  ss:    { min: 1480, max: 1560, colorscale: "Viridis",  color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  temp:  { min: 0,    max: 35,   colorscale: "RdYlBu_r", color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  salt:  { min: 30,   max: 40,   colorscale: "Blues",    color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  uo:    { min: -1.5, max: 1.5,  colorscale: "RdBu_r",   color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  vo:    { min: -1.5, max: 1.5,  colorscale: "RdBu_r",   color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  uv:    { min: 0,    max: 2,    colorscale: "Viridis",  color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  u10:   { min: -15,  max: 15,   colorscale: "RdBu_r",   color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  v10:   { min: -15,  max: 15,   colorscale: "RdBu_r",   color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  wind:  { min: 0,    max: 20,   colorscale: "YlOrRd",   color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  swh:   { min: 0,    max: 6,    colorscale: "Blues",    color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  mwd_u: { min: -1,   max: 1,    colorscale: "RdBu_r",   color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  mwd_v: { min: -1,   max: 1,    colorscale: "RdBu_r",   color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
+  mwd:   { min: 0,    max: 360, colorscale: "HSV",      color_min: null, color_max: null, depth_min: null, depth_max: null, value_min: null, value_max: null },
 };
 
 const COLORSCALES = [
   "Viridis", "Plasma", "Inferno", "Magma", "Cividis",
   "RdYlBu_r", "RdBu_r", "Spectral_r",
   "Blues", "Greens", "YlOrRd",
-  "Jet", "Turbo", "Rainbow",
-  "HSV",
+  "Jet", "Turbo", "Rainbow", "HSV",
 ];
 
 const PLOTLY_CONFIG = {
@@ -98,6 +97,94 @@ const PLOTLY_CONFIG_MAP = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * 双端滑块，纯 JS 拖动实现，与两个数字输入框双向耦合。
+ * opts: { wrap, minInput, maxInput, fillEl, thumbMin, thumbMax, min, max }
+ * 返回 { setRange(lo, hi), setBounds(lo, hi) }
+ */
+function initDualRange(opts) {
+  const { wrap, minInput, maxInput, fillEl, thumbMin, thumbMax } = opts;
+  let boundsLo = opts.min, boundsHi = opts.max;
+  let valLo = opts.min, valHi = opts.max;
+
+  function pct(v) { return (v - boundsLo) / (boundsHi - boundsLo || 1); }
+
+  function updateUI() {
+    const pLo = pct(valLo) * 100, pHi = pct(valHi) * 100;
+    thumbMin.style.left = pLo + "%";
+    thumbMax.style.left = pHi + "%";
+    fillEl.style.left   = pLo + "%";
+    fillEl.style.width  = (pHi - pLo) + "%";
+  }
+
+  function setRange(lo, hi) {
+    valLo = Math.max(boundsLo, Math.min(lo, boundsHi));
+    valHi = Math.max(boundsLo, Math.min(hi, boundsHi));
+    if (valLo > valHi) valLo = valHi;
+    minInput.value = +valLo.toFixed(2);
+    maxInput.value = +valHi.toFixed(2);
+    updateUI();
+  }
+
+  function setBounds(lo, hi) {
+    boundsLo = lo; boundsHi = hi;
+    valLo = Math.max(lo, Math.min(valLo, hi));
+    valHi = Math.max(lo, Math.min(valHi, hi));
+    updateUI();
+  }
+
+  function xToVal(clientX) {
+    const rect = wrap.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return boundsLo + ratio * (boundsHi - boundsLo);
+  }
+
+  wrap.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const clickVal = xToVal(e.clientX);
+    // 选择距离点击位置更近的拇指
+    const distLo = Math.abs(clickVal - valLo);
+    const distHi = Math.abs(clickVal - valHi);
+    let dragging = distLo <= distHi ? "lo" : "hi";
+
+    function onMove(e) {
+      const v = xToVal(e.clientX);
+      if (dragging === "lo") {
+        valLo = Math.max(boundsLo, Math.min(v, valHi));
+        minInput.value = +valLo.toFixed(2);
+      } else {
+        valHi = Math.min(boundsHi, Math.max(v, valLo));
+        maxInput.value = +valHi.toFixed(2);
+      }
+      updateUI();
+    }
+
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    }
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    onMove(e);
+  });
+
+  // 输入框同步到滑块
+  minInput.addEventListener("change", () => {
+    const v = parseFloat(minInput.value);
+    if (!isNaN(v)) setRange(v, valHi);
+  });
+  maxInput.addEventListener("change", () => {
+    const v = parseFloat(maxInput.value);
+    if (!isNaN(v)) setRange(valLo, v);
+  });
+
+  setBounds(opts.min, opts.max);
+  setRange(opts.min, opts.max);
+
+  return { setRange, setBounds };
+}
 
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, options);
@@ -147,7 +234,7 @@ function _syncCbarInputs(range) {
 function _syncConfigUI(variable) {
   const cfg = state.varConfig[variable];
   if (!cfg) return;
-  _syncCbarInputs([cfg.min, cfg.max]);
+  _syncCbarInputs(null);  // 输入框由滑块拇指控制，不从 varConfig 读
 
   const sel       = document.getElementById("colorscale-select");
   const minSwatch = document.getElementById("color-min-swatch");
@@ -168,6 +255,15 @@ function _syncConfigUI(variable) {
     if (minSwatch) minSwatch.value = "#000000";
     if (maxSwatch) maxSwatch.value = "#000000";
   }
+
+  const setVal = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.value = (v != null) ? v : "";
+  };
+  setVal("depth-min", cfg.depth_min);
+  setVal("depth-max", cfg.depth_max);
+  setVal("speed-min", cfg.value_min);
+  setVal("speed-max", cfg.value_max);
 }
 
 // Drag helpers
@@ -351,16 +447,14 @@ async function initMainScreen() {
   state.dateIdx  = 0;
   state.points     = [];
   state.depthIdx   = 0;
-  state.variable   = "ss";
-  state.varType    = "3d";
-  state.isVector   = false;
+  const savedVar   = sessionStorage.getItem("lastVariable");
+  const initVar    = (savedVar && VAR_DEFAULTS[savedVar]) ? savedVar : "ss";
+  state.variable   = initVar;
+  state.varType    = (state.meta.vars_2d || []).includes(initVar) ? "2d" : "3d";
+  state.isVector   = (state.meta.vars_vector || []).includes(initVar) || initVar === "mwd";
   state.quiverStep = 20;
   state.depthRange = null;
   state.valueRange = null;
-  ["depth-min","depth-max","speed-min","speed-max"].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = "";
-  });
 
   // Initialise per-variable config from server
   const allVars = Object.keys(VAR_DEFAULTS);
@@ -369,11 +463,16 @@ async function initMainScreen() {
     allVars.forEach(v => {
       state.varConfig[v] = saved[v] ? { ...VAR_DEFAULTS[v], ...saved[v] } : { ...VAR_DEFAULTS[v] };
     });
+    if (Array.isArray(saved.visible_layers)) {
+      state.varConfig["visible_layers"] = saved.visible_layers;
+    }
   } catch {
     allVars.forEach(v => { state.varConfig[v] = { ...VAR_DEFAULTS[v] }; });
   }
-  const initCfg = state.varConfig["ss"];
+  const initCfg = state.varConfig[initVar];
   state.colorRange = [initCfg.min, initCfg.max];
+  state.depthRange = (initCfg.depth_min != null && initCfg.depth_max != null) ? [initCfg.depth_min, initCfg.depth_max] : null;
+  state.valueRange = (initCfg.value_min != null && initCfg.value_max != null) ? [initCfg.value_min, initCfg.value_max] : null;
 
   // Populate colorscale select
   const sel = document.getElementById("colorscale-select");
@@ -386,7 +485,7 @@ async function initMainScreen() {
       sel.appendChild(opt);
     });
   }
-  _syncConfigUI("ss");
+  _syncConfigUI(initVar);
 
   // Link color swatches ↔ hex inputs; handle preset/custom mutual exclusion
   function _linkColor(swatchId, hexId) {
@@ -434,13 +533,13 @@ async function initMainScreen() {
   setText("meta-grid",   `${m.grid_shape ? m.grid_shape.join(" × ") : "--"}`);
   setText("depth-index", `第 1 / ${m.depths.length} 层`);
   setText("depth-total", `共 ${m.depths.length} 层`);
-  _updateVarLabels("ss");
+  _updateVarLabels(initVar);
 
   function _updateVolTitle(variable) {
     const el = document.getElementById("vol-panel-title");
     if (el) el.textContent = `3D ${VAR_LABELS[variable] || ""}场`;
   }
-  _updateVolTitle("ss");
+  _updateVolTitle(initVar);
 
   function _apply2DMode() {
     const is2d = state.varType === "2d";
@@ -453,6 +552,9 @@ async function initMainScreen() {
     const depthSlider = document.getElementById("depth-slider");
     const depthSelect = document.getElementById("depth-select");
     const quiverRow   = document.getElementById("quiver-density-row");
+    const modeCard    = document.querySelector(".side-card:has(#mode-point)") ||
+                        document.getElementById("mode-point")?.closest(".side-card");
+    const modeRadios  = document.querySelectorAll('input[name="mode"]');
 
     if (panel3d)    panel3d.style.display    = is2d ? "none" : "";
     if (resizer)    resizer.style.display    = is2d ? "none" : "";
@@ -462,31 +564,44 @@ async function initMainScreen() {
     if (depthSelect) depthSelect.disabled = is2d;
     if (depthCard) depthCard.style.opacity = is2d ? "0.4" : "";
     if (quiverRow) quiverRow.classList.toggle("hidden", !state.isVector);
+    if (modeCard)  modeCard.style.opacity = is2d ? "0.4" : "";
+    modeRadios.forEach(r => { r.disabled = is2d; });
 
     // Trigger Plotly resize so the map fills newly available space
     const mapEl = document.getElementById("layer-map-graph");
-    if (mapEl) requestAnimationFrame(() => Plotly.Plots.resize(mapEl));
+    if (mapEl) {
+      requestAnimationFrame(() => {
+        Plotly.Plots.resize(mapEl);
+        setTimeout(() => Plotly.Plots.resize(mapEl), 150);
+      });
+    }
   }
 
   // Variable cards — both groups
   document.querySelectorAll(".var-card").forEach(card => {
-    card.classList.toggle("active", card.dataset.var === "ss");
+    card.classList.toggle("active", card.dataset.var === initVar);
     card.addEventListener("click", () => {
       document.querySelectorAll(".var-card").forEach(c => c.classList.remove("active"));
       card.classList.add("active");
       const v = card.dataset.var;
+      sessionStorage.setItem("lastVariable", v);
       state.variable   = v;
       state.varType    = (state.meta.vars_2d || []).includes(v) ? "2d" : "3d";
-      state.isVector   = (state.meta.vars_vector || []).includes(v);
-      state.depthRange = null;
-      state.valueRange = null;
-      ["depth-min","depth-max","speed-min","speed-max"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = "";
-      });
+      state.isVector   = (state.meta.vars_vector || []).includes(v) || v === "mwd";
       const cfg = state.varConfig[v];
+      state.depthRange = (cfg && cfg.depth_min != null && cfg.depth_max != null) ? [cfg.depth_min, cfg.depth_max] : null;
+      state.valueRange = (cfg && cfg.value_min != null && cfg.value_max != null) ? [cfg.value_min, cfg.value_max] : null;
       state.colorRange = cfg ? [cfg.min, cfg.max] : null;
       _syncConfigUI(v);
+      // bar 边界 = 数据实际范围，拇指位置 = varConfig 设置的色标范围
+      const dataRange = state.meta.variables?.[v] || { min: cfg?.min, max: cfg?.max };
+      dualCbar.setBounds(dataRange.min, dataRange.max);
+      dualCbar.setRange(cfg?.min ?? dataRange.min, cfg?.max ?? dataRange.max);
+      dualValue.setBounds(dataRange.min, dataRange.max);
+      if (state.valueRange) dualValue.setRange(state.valueRange[0], state.valueRange[1]);
+      else { dualValue.setRange(dataRange.min, dataRange.max); document.getElementById("speed-min").value = ""; document.getElementById("speed-max").value = ""; }
+      if (state.depthRange) dualDepth.setRange(state.depthRange[0], state.depthRange[1]);
+      else { dualDepth.setRange(depthLo, depthHi); document.getElementById("depth-min").value = ""; document.getElementById("depth-max").value = ""; }
       _updateVarLabels(v);
       _updateVolTitle(v);
       _apply2DMode();
@@ -539,6 +654,15 @@ async function initMainScreen() {
     _debouncedDepthChange(i);
   });
 
+  const VALUE_RANGE_IDS = ["value-range-divider","value-range-label","speed-min","value-range-sep","speed-max","value-range-unit","value-dual-wrap"];
+  function _applyValueRangeVisibility() {
+    const show = state.mode === "transect";
+    VALUE_RANGE_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = show ? "" : "none";
+    });
+  }
+
   // Mode radio
   document.querySelectorAll('input[name="mode"]').forEach((radio) => {
     radio.checked = radio.value === "point";
@@ -547,11 +671,13 @@ async function initMainScreen() {
       state.points = [];
       document.getElementById("mode-point").classList.toggle("active", state.mode === "point");
       document.getElementById("mode-transect").classList.toggle("active", state.mode === "transect");
+      _applyValueRangeVisibility();
       renderLayer(state.depthIdx, []);
       renderProfile();
     });
   });
   state.mode = "point";
+  _applyValueRangeVisibility();
 
   // Clear button
   document.getElementById("clear-btn").onclick = () => {
@@ -561,24 +687,23 @@ async function initMainScreen() {
   };
 
   // Range controls
-  document.getElementById("range-apply-btn").onclick = () => {
+  document.getElementById("range-apply-btn").onclick = async () => {
     const dMin = parseFloat(document.getElementById("depth-min").value);
     const dMax = parseFloat(document.getElementById("depth-max").value);
     const vMin = parseFloat(document.getElementById("speed-min").value);
     const vMax = parseFloat(document.getElementById("speed-max").value);
     state.depthRange = (!isNaN(dMin) && !isNaN(dMax)) ? [dMin, dMax] : null;
     state.valueRange = (!isNaN(vMin) && !isNaN(vMax)) ? [vMin, vMax] : null;
+    if (state.varConfig[state.variable]) {
+      state.varConfig[state.variable].depth_min = state.depthRange ? dMin : null;
+      state.varConfig[state.variable].depth_max = state.depthRange ? dMax : null;
+      state.varConfig[state.variable].value_min = state.valueRange ? vMin : null;
+      state.varConfig[state.variable].value_max = state.valueRange ? vMax : null;
+      try { await apiFetch("/api/config", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(state.varConfig) }); } catch {}
+    }
     renderProfile();
   };
 
-  document.getElementById("range-reset-btn").onclick = () => {
-    state.depthRange = null;
-    state.valueRange = null;
-    ["depth-min","depth-max","speed-min","speed-max"].forEach(id => {
-      document.getElementById(id).value = "";
-    });
-    renderProfile();
-  };
   // Colorbar range — unified control
   document.getElementById("cbar-apply").onclick = async () => {
     const cmin    = parseFloat(document.getElementById("cmin").value);
@@ -590,16 +715,16 @@ async function initMainScreen() {
     const hasCustom = hexRe.test(cMinHex) && hexRe.test(cMaxHex);
 
     if (!isNaN(cmin) && !isNaN(cmax)) {
+      const prev = state.varConfig[state.variable] || {};
       state.varConfig[state.variable] = {
+        ...prev,
         min: cmin, max: cmax,
         colorscale:  hasCustom ? null : (cs || VAR_DEFAULTS[state.variable].colorscale),
         color_min:   hasCustom ? cMinHex : null,
         color_max:   hasCustom ? cMaxHex : null,
       };
       state.colorRange = [cmin, cmax];
-      state.valueRange = [cmin, cmax];
-      document.getElementById("speed-min").value = cmin;
-      document.getElementById("speed-max").value = cmax;
+      dualCbar.setRange(cmin, cmax);
       try { await apiFetch("/api/config", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(state.varConfig) }); } catch {}
       renderVolume();
       renderLayer(state.depthIdx, state.points);
@@ -607,7 +732,99 @@ async function initMainScreen() {
     }
   };
 
-  // Render charts
+  // 初始化三个双端滑块
+  const depthArr    = state.meta.depths;
+  const depthLo     = depthArr[0], depthHi = depthArr[depthArr.length - 1];
+  const ssDataRange = state.meta.variables?.[initVar] || { min: state.varConfig[initVar].min, max: state.varConfig[initVar].max };
+  const ssCfg       = state.varConfig[initVar];
+
+  const dualCbar = initDualRange({
+    wrap:       document.getElementById("cbar-dual-wrap"),
+    minInput:   document.getElementById("cmin"),
+    maxInput:   document.getElementById("cmax"),
+    thumbMin:   document.getElementById("cbar-thumb-min"),
+    thumbMax:   document.getElementById("cbar-thumb-max"),
+    fillEl:     document.getElementById("cbar-dual-fill"),
+    min: ssDataRange.min, max: ssDataRange.max,
+  });
+  // 拇指位置 = 已保存的显示范围（varConfig）；边界 = 数据实际范围（上方已 setBounds）
+  dualCbar.setRange(ssCfg.min, ssCfg.max);
+
+  const dualDepth = initDualRange({
+    wrap:       document.getElementById("depth-dual-wrap"),
+    minInput:   document.getElementById("depth-min"),
+    maxInput:   document.getElementById("depth-max"),
+    thumbMin:   document.getElementById("depth-thumb-min"),
+    thumbMax:   document.getElementById("depth-thumb-max"),
+    fillEl:     document.getElementById("depth-dual-fill"),
+    min: depthLo, max: depthHi,
+  });
+  document.getElementById("depth-min").value = "";
+  document.getElementById("depth-max").value = "";
+
+  const dualValue = initDualRange({
+    wrap:       document.getElementById("value-dual-wrap"),
+    minInput:   document.getElementById("speed-min"),
+    maxInput:   document.getElementById("speed-max"),
+    thumbMin:   document.getElementById("value-thumb-min"),
+    thumbMax:   document.getElementById("value-thumb-max"),
+    fillEl:     document.getElementById("value-dual-fill"),
+    min: ssDataRange.min, max: ssDataRange.max,
+  });
+  document.getElementById("speed-min").value = "";
+  document.getElementById("speed-max").value = "";
+
+  // 3D 显示层 checkboxes
+  const layerChecksEl = document.getElementById("layer-vis-checks");
+  const n = state.meta.depths.length;
+  const savedLayers = (Array.isArray(state.varConfig["visible_layers"]))
+    ? state.varConfig["visible_layers"].filter(i => i >= 0 && i < n)
+    : null;
+  state.visibleLayers = savedLayers
+    ? state.meta.depths.map((_, i) => savedLayers.includes(i))
+    : state.meta.depths.map((_, i) => i % 2 === 0);
+
+  function _buildLayerChecks() {
+    layerChecksEl.innerHTML = "";
+    state.meta.depths.forEach((d, i) => {
+      const label = document.createElement("label");
+      label.className = "layer-check-item";
+      const cb = document.createElement("input");
+      cb.type    = "checkbox";
+      cb.dataset.idx = i;
+      cb.checked = state.visibleLayers[i];
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(`${i + 1} - ${d.toFixed(1)} m`));
+      layerChecksEl.appendChild(label);
+    });
+  }
+  _buildLayerChecks();
+
+  document.getElementById("layer-vis-all").onclick = () => {
+    state.visibleLayers = state.visibleLayers.map(() => true);
+    layerChecksEl.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true);
+  };
+  document.getElementById("layer-vis-none").onclick = () => {
+    state.visibleLayers = state.visibleLayers.map(() => false);
+    layerChecksEl.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false);
+  };
+  document.getElementById("layer-vis-even").onclick = () => {
+    layerChecksEl.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      cb.checked = parseInt(cb.dataset.idx) % 2 === 0;
+    });
+    state.visibleLayers = state.meta.depths.map((_, i) => i % 2 === 0);
+  };
+  document.getElementById("layer-vis-apply").onclick = async () => {
+    layerChecksEl.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      state.visibleLayers[parseInt(cb.dataset.idx)] = cb.checked;
+    });
+    state.varConfig["visible_layers"] = state.visibleLayers
+      .map((v, i) => v ? i : -1).filter(i => i >= 0);
+    try { await apiFetch("/api/config", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(state.varConfig) }); } catch {}
+    renderVolume();
+  };
+
+
   const timelineCard = document.getElementById("timeline-card");
   const dateSelect   = document.getElementById("date-select");
   const dateSlider   = document.getElementById("date-slider");
@@ -671,7 +888,10 @@ async function initMainScreen() {
 // ---------------------------------------------------------------------------
 
 async function renderVolume() {
-  if (state.varType === "2d") return;  // 2D variables have no volume view
+  if (state.varType === "2d") return;
+  const loadingEl = document.getElementById("vol-loading");
+  if (loadingEl) loadingEl.classList.remove("hidden");
+  try {
   const cfg = state.varConfig[state.variable] || {};
   const params = new URLSearchParams({ variable: state.variable });
   if (state.colorRange) {
@@ -685,8 +905,17 @@ async function renderVolume() {
     params.set("colorscale", cfg.colorscale);
   }
   if (state.isSeries) params.set("date_idx", state.dateIdx);
+  if (state.visibleLayers) {
+    const selected = state.visibleLayers
+      .map((v, i) => v ? i : -1).filter(i => i >= 0);
+    if (selected.length) params.set("layers", selected.join(","));
+  }
   const data = await apiFetch(`/api/volume?${params}`);
   Plotly.react("vol-graph", data.data, data.layout, PLOTLY_CONFIG);
+
+  const selectedLayers = state.visibleLayers
+    ? state.visibleLayers.map((v, i) => v ? i : -1).filter(i => i >= 0)
+    : Array.from({length: state.meta.depths.length}, (_, i) => i);
 
   // Re-attach click handler (react may replace the element)
   document.getElementById("vol-graph").removeAllListeners &&
@@ -694,15 +923,22 @@ async function renderVolume() {
   document.getElementById("vol-graph").on("plotly_click", (evt) => {
     if (!evt || !evt.points || !evt.points.length) return;
     const curveNumber = evt.points[0].curveNumber;
-    if (curveNumber >= 0 && curveNumber < state.meta.depths.length) {
-      document.getElementById("depth-select").value = curveNumber;
-      document.getElementById("depth-slider").value = curveNumber;
-      onDepthChange(curveNumber);
+    const depthIdx = selectedLayers[curveNumber];
+    if (depthIdx != null && depthIdx >= 0 && depthIdx < state.meta.depths.length) {
+      document.getElementById("depth-select").value = depthIdx;
+      document.getElementById("depth-slider").value = depthIdx;
+      onDepthChange(depthIdx);
     }
   });
+  } finally {
+    if (loadingEl) loadingEl.classList.add("hidden");
+  }
 }
 
 async function renderLayer(depthIdx, points = []) {
+  const loadingEl = document.getElementById("layer-loading");
+  if (loadingEl && !state.playing) loadingEl.classList.remove("hidden");
+  try {
   const cfg = state.varConfig[state.variable] || {};
   const params = new URLSearchParams({ variable: state.variable });
   if (points.length) params.set("points", JSON.stringify(points));
@@ -745,9 +981,16 @@ async function renderLayer(depthIdx, points = []) {
   document.getElementById("layer-panel-title").textContent = data.title;
 
   attachMapClick();
+  } finally {
+    if (loadingEl) loadingEl.classList.add("hidden");
+  }
 }
 
 async function renderProfile() {
+  const loadingEl = document.getElementById("profile-loading");
+  if (loadingEl && !state.playing) loadingEl.classList.remove("hidden");
+  try {
+
   if (!state.points.length) {
     const empty = emptyFigure("在右侧地图点击选点，查看垂直剖面或断面");
     Plotly.react("profile-graph", empty.data, empty.layout, PLOTLY_CONFIG);
@@ -810,6 +1053,9 @@ async function renderProfile() {
     Plotly.react("profile-graph", data.figure.data, data.figure.layout, PLOTLY_CONFIG);
     setProfileTitle(data.title);
     setClickInfo(data.info);
+  }
+  } finally {
+    if (loadingEl) loadingEl.classList.add("hidden");
   }
 }
 
@@ -945,14 +1191,17 @@ function startPlayback() {
   const playStatus = document.getElementById("play-status");
   if (playBtn) { playBtn.textContent = "⏹ 停止"; playBtn.classList.add("playing"); }
 
+  const intervalSlider = document.getElementById("play-interval");
+  const intervalMs = intervalSlider ? parseInt(intervalSlider.value) * 1000 : 3000;
+
   function tick() {
     if (!state.playing) return;
     const next = (state.dateIdx + 1) % state.dates.length;
-    if (state.playing) state.playTimer = setTimeout(tick, 3000);
+    if (state.playing) state.playTimer = setTimeout(tick, intervalMs);
     onDateChange(next);
   }
-  state.playTimer = setTimeout(tick, 3000);
-  if (playStatus) playStatus.textContent = "3s / 帧";
+  state.playTimer = setTimeout(tick, intervalMs);
+  if (playStatus) playStatus.textContent = `${intervalMs / 1000}s / 帧`;
 }
 
 function stopPlayback() {

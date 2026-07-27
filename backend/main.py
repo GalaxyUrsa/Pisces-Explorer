@@ -28,7 +28,7 @@ _state: dict = {}
 
 VARS_3D     = {"ss", "temp", "salt", "uo", "vo", "uv"}
 VARS_2D     = {"u10", "v10", "wind", "swh", "mwd_u", "mwd_v", "mwd"}
-VARS_VECTOR = {"uv", "wind", "mwd"}
+VARS_VECTOR = {"uv", "wind"}
 VARIABLES   = VARS_3D | VARS_2D
 
 
@@ -50,18 +50,34 @@ def _get_data(variable: str, frame: dict = None):
     if variable == "wind":
         return src["u10"], src["v10"]
     if variable == "mwd":
-        return src["mwd_u"], src["mwd_v"]
+        u, v = src["mwd_u"], src["mwd_v"]
+        import numpy as np
+        return (90 - np.degrees(np.arctan2(v, u))) % 360
     return src[variable]
 
 
+def _finite_range(data):
+    """Return the finite data range, or (None, None) when no values exist."""
+    import numpy as np
+    arr = np.asarray(data)
+    finite = arr[np.isfinite(arr)]
+    if finite.size == 0:
+        return None, None
+    return float(finite.min()), float(finite.max())
+
+
 def _init_state(data: dict):
+    import numpy as np
     for key in ("ss", "temp", "salt", "uo", "vo", "u10", "v10", "swh", "mwd_u", "mwd_v",
                 "lats", "lons", "depths"):
         _state[key] = data[key]
     for var in ("ss", "temp", "salt", "uo", "vo", "uv", "u10", "v10", "wind", "swh", "mwd_u", "mwd_v", "mwd"):
-        meta = VAR_META.get(var, {})
-        _state[f"{var}_min"] = float(meta.get("vmin", 0))
-        _state[f"{var}_max"] = float(meta.get("vmax", 1))
+        arr = _get_data(var)
+        if isinstance(arr, tuple):
+            arr = np.sqrt(arr[0]**2 + arr[1]**2)
+        vmin, vmax = _finite_range(arr)
+        _state[f"{var}_min"] = vmin
+        _state[f"{var}_max"] = vmax
     for key in ("volume_ss", "volume_temp", "volume_salt", "volume_uo", "volume_vo", "volume_uv"):
         _state.pop(key, None)
     print("Data loaded. Volume figures will be computed on first request.")
@@ -69,9 +85,23 @@ def _init_state(data: dict):
 
 def _init_series(frames: list[dict]):
     """Store a list of frame dicts; frame 0 becomes the active single-frame state too."""
+    import numpy as np
     _state["series"] = frames
     _state["series_dates"] = [f["date"] for f in frames]
     _init_state(frames[0])
+    # 用所有帧的全局范围覆盖单帧算出的范围
+    for var in ("ss", "temp", "salt", "uo", "vo", "uv", "u10", "v10", "wind", "swh", "mwd_u", "mwd_v", "mwd"):
+        all_min, all_max = [], []
+        for frame in frames:
+            arr = _get_data(var, frame)
+            if isinstance(arr, tuple):
+                arr = np.sqrt(arr[0]**2 + arr[1]**2)
+            vmin, vmax = _finite_range(arr)
+            if vmin is not None:
+                all_min.append(vmin)
+                all_max.append(vmax)
+        _state[f"{var}_min"] = min(all_min) if all_min else None
+        _state[f"{var}_max"] = max(all_max) if all_max else None
 
 
 def _is_series() -> bool:
@@ -122,7 +152,7 @@ def init_data(nc_dir: str, date_str: str):
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Ocean Sound Speed API")
+app = FastAPI(title="Pisces-Explorer API")
 
 
 # ---------------------------------------------------------------------------
@@ -252,9 +282,16 @@ def get_meta():
         "lat_range":   [float(lats[0]), float(lats[-1])],
         "lon_range":   [float(lons[0]), float(lons[-1])],
         "variables": {
-            v: {"min": _state[f"{v}_min"], "max": _state[f"{v}_max"]}
+            v: {
+                "min": _state[f"{v}_min"],
+                "max": _state[f"{v}_max"],
+                "available": _state[f"{v}_min"] is not None,
+            }
             for v in VARIABLES
         },
+        "available_variables": sorted(
+            v for v in VARIABLES if _state[f"{v}_min"] is not None
+        ),
         "grid_shape":  [int(lats.shape[0]), int(lons.shape[0])],
         "vars_3d":     sorted(VARS_3D),
         "vars_2d":     sorted(VARS_2D),
@@ -269,6 +306,7 @@ def get_volume(variable: Annotated[str, Query()] = "ss",
                colorscale: Annotated[Optional[str], Query()] = None,
                color_min: Annotated[Optional[str], Query()] = None,
                color_max: Annotated[Optional[str], Query()] = None,
+               layers: Annotated[Optional[str], Query()] = None,
                date_idx: Annotated[int, Query()] = 0):
     _require_data()
     if variable not in VARS_3D:
@@ -280,13 +318,20 @@ def get_volume(variable: Annotated[str, Query()] = "ss",
         u, v = data
         data = np.sqrt(u**2 + v**2)
     custom = [color_min, color_max] if (color_min and color_max) else None
-    if not _is_series() and cmin is None and cmax is None and colorscale is None and custom is None:
+    depth_indices = None
+    if layers is not None:
+        try:
+            depth_indices = [int(x) for x in layers.split(",") if x.strip()]
+        except ValueError:
+            pass
+    if not _is_series() and cmin is None and cmax is None and colorscale is None and custom is None and depth_indices is None:
         return _ensure_volume(variable)
     return make_volume_fig(data, frame["lats"], frame["lons"],
                            frame["depths"], variable=variable,
                            vmin=cmin, vmax=cmax,
                            colorscale=None if custom else colorscale,
-                           colorscale_custom=custom)
+                           colorscale_custom=custom,
+                           depth_indices=depth_indices)
 
 
 @app.get("/api/layer/{depth_idx}")
@@ -340,11 +385,15 @@ def get_layer(depth_idx: int,
 
     quiver_uv = (u_surf, v_surf, step) if (variable in VARS_VECTOR and v_surf is not None) else None
 
-    # For vector variables: mwd shows direction angle as heatmap; others show magnitude
-    if variable == "mwd" and v_surf is not None:
-        import numpy as np
-        heatmap_data = (np.degrees(np.arctan2(u_surf, v_surf)) + 360) % 360
-    elif variable in VARS_VECTOR and v_surf is not None:
+    # mwd: heatmap is angle (scalar), but arrows come from raw mwd_u/mwd_v
+    if variable == "mwd":
+        mwd_u = frame.get("mwd_u")
+        mwd_v = frame.get("mwd_v")
+        if mwd_u is not None and mwd_v is not None:
+            quiver_uv = (mwd_u, mwd_v, step)
+
+    # For vector variables, pass magnitude as the heatmap data
+    if variable in VARS_VECTOR and v_surf is not None:
         import numpy as np
         heatmap_data = np.sqrt(u_surf**2 + v_surf**2)
     elif is_2d:
