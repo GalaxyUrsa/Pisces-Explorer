@@ -129,6 +129,7 @@ def load_series(items: list) -> list[dict]:
         try:
             frame = load_from_path(path)
             frame["date"] = date_str
+            frame["filename"] = os.path.basename(display_name)
             frames.append(frame)
         except Exception as e:
             raise RuntimeError(f"Failed to load {display_name}: {e}") from e
