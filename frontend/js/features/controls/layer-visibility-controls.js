@@ -40,6 +40,7 @@ const LayerVisibilityControls = (() => {
       });
     };
     document.getElementById("layer-vis-apply").onclick = async () => {
+      TimelineController.stop();
       checkboxes().forEach(checkbox => {
         state.visibleLayers[Number.parseInt(checkbox.dataset.idx)] = (
           checkbox.checked
@@ -48,11 +49,11 @@ const LayerVisibilityControls = (() => {
       state.varConfig.visible_layers = state.visibleLayers
         .map((visible, index) => visible ? index : -1)
         .filter(index => index >= 0);
-      await RangeControls.save(apiFetch, state.varConfig);
+      await RangeControls.save(apiFetch);
       renderVolume();
+      PiscesUIEvents.panel(state);
     };
   }
 
   return { initialize };
 })();
-

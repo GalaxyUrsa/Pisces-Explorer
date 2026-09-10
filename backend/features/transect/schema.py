@@ -21,4 +21,4 @@ class TransectRequest(BaseModel):
     value_range: Optional[list] = None
     date_idx: int = 0
     comparison_source: str = "a"
-
+    region: Optional[list[float]] = None

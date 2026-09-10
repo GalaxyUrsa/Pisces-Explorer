@@ -1,10 +1,7 @@
 /** Shared A/B/difference request cache and target-driven comparison renderer. */
 const ComparisonView = (() => {
-  let cacheKey = null;
-  let cachePromise = null;
-  let requestId = 0;
-  let savedRange = null;
-  let syncing = false;
+  const cachePromises = new Map();
+  const savedRanges = new Map();
 
   function createRequestKey(options, actualDepth) {
     return JSON.stringify({
@@ -13,16 +10,14 @@ const ComparisonView = (() => {
       date: options.dateIdx,
       colorRange: options.colorRange,
       colorscale: options.colorscale,
+      quiverStep: options.quiverStep,
+      region: options.region,
       points: options.points,
     });
   }
 
-  function load(options) {
+  function requestUrl(options) {
     const actualDepth = options.is2d ? 0 : options.depthIdx;
-    const key = createRequestKey(options, actualDepth);
-    if (key === cacheKey && cachePromise) return cachePromise;
-    cacheKey = key;
-    const currentRequest = ++requestId;
     const params = new URLSearchParams({
       variable: options.variable,
       date_idx: options.dateIdx,
@@ -35,16 +30,26 @@ const ComparisonView = (() => {
       params.set("cmax", options.colorRange[1]);
     }
     if (options.colorscale) params.set("colorscale", options.colorscale);
-    cachePromise = options.fetchJson(
-      `/api/comparison/layer/${actualDepth}?${params}`
-    ).then(data => {
-      if (currentRequest !== requestId) return null;
-      return data;
-    }).catch(error => {
-      if (key === cacheKey) cachePromise = null;
+    if (options.quiverStep) params.set("step", options.quiverStep);
+    RegionControls.appendQuery(params, options.region);
+    return `/api/comparison/layer/${actualDepth}?${params}`;
+  }
+
+  function load(options) {
+    const actualDepth = options.is2d ? 0 : options.depthIdx;
+    const key = createRequestKey(options, actualDepth);
+    if (cachePromises.has(key)) return cachePromises.get(key);
+    const promise = options.fetchJson(
+      requestUrl(options)
+    ).catch(error => {
+      cachePromises.delete(key);
       throw error;
     });
-    return cachePromise;
+    if (cachePromises.size >= 4) {
+      cachePromises.delete(cachePromises.keys().next().value);
+    }
+    cachePromises.set(key, promise);
+    return promise;
   }
 
   function figureFor(data, source) {
@@ -66,7 +71,8 @@ const ComparisonView = (() => {
         : `MAE ${metrics.mae.toFixed(3)} · RMSE ${metrics.rmse.toFixed(3)}`;
       return `差值 A−B · ${data.date} · ${metricText}`;
     }
-    return `序列 ${source.toUpperCase()} · ${data.date}${statsText}${changeText}`;
+    const sourceDate = data.source_dates?.[source] || data.date;
+    return `序列 ${source.toUpperCase()} · ${sourceDate}${statsText}${changeText}`;
   }
 
   function rangeUpdate(eventData) {
@@ -81,22 +87,12 @@ const ComparisonView = (() => {
     };
   }
 
-  function attachRangeSync(graph) {
+  function attachRangeSync(graph, slotId) {
     graph.removeAllListeners?.("plotly_relayout");
-    graph.on("plotly_relayout", async eventData => {
-      if (syncing) return;
+    graph.on("plotly_relayout", eventData => {
       const update = rangeUpdate(eventData);
       if (!update) return;
-      savedRange = update;
-      const peers = [...document.querySelectorAll(
-        '.slot-graph[data-view-kind="comparison"]'
-      )].filter(item => item !== graph);
-      syncing = true;
-      try {
-        await Promise.all(peers.map(peer => Plotly.relayout(peer, update)));
-      } finally {
-        syncing = false;
-      }
+      savedRanges.set(slotId, update);
     });
   }
 
@@ -104,23 +100,23 @@ const ComparisonView = (() => {
     if (!data) return false;
     const figure = figureFor(data, source);
     await Plotly.react(slot.graph, figure.data, figure.layout, plotConfig);
+    LayerView.updateQuiverInfo(data.quiver?.[source]);
     slot.title.textContent = titleFor(data, source);
     slot.source.textContent = source === "difference"
       ? "数据来源：序列 A−序列 B"
       : `数据来源：序列 ${source.toUpperCase()}`;
     slot.graph.dataset.viewKind = "comparison";
+    const savedRange = savedRanges.get(slot.id);
     if (savedRange) await Plotly.relayout(slot.graph, savedRange);
-    attachRangeSync(slot.graph);
+    attachRangeSync(slot.graph, slot.id);
     attachInteractions(slot.graph, slot.id);
     return true;
   }
 
   function reset() {
-    requestId += 1;
-    cacheKey = null;
-    cachePromise = null;
-    savedRange = null;
+    cachePromises.clear();
+    savedRanges.clear();
   }
 
-  return { load, render, reset };
+  return { load, render, requestUrl, reset };
 })();

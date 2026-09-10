@@ -1,0 +1,532 @@
+{
+  "ss": {
+    "min": 1447.37,
+    "max": 1540,
+    "colorscale": "Viridis",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": 0.49,
+    "depth_max": 500,
+    "value_min": null,
+    "value_max": null
+  },
+  "temp": {
+    "min": 0,
+    "max": 35,
+    "colorscale": "RdYlBu_r",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": 0.49,
+    "depth_max": 644.01,
+    "value_min": null,
+    "value_max": null
+  },
+  "salt": {
+    "min": 30,
+    "max": 35,
+    "colorscale": "Blues",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": 0.49,
+    "depth_max": 500,
+    "value_min": 30,
+    "value_max": 35
+  },
+  "uo": {
+    "min": -1.5,
+    "max": 1.5,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "value_min": null,
+    "value_max": null
+  },
+  "vo": {
+    "min": -1.5,
+    "max": 1.5,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "value_min": null,
+    "value_max": null
+  },
+  "uv": {
+    "min": 0,
+    "max": 2,
+    "colorscale": "Blues",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": 0.49,
+    "depth_max": 500,
+    "value_min": 0,
+    "value_max": 1
+  },
+  "u10": {
+    "min": -15,
+    "max": 15,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "value_min": null,
+    "value_max": null
+  },
+  "v10": {
+    "min": -15,
+    "max": 15,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "value_min": null,
+    "value_max": null
+  },
+  "wind": {
+    "min": 0,
+    "max": 20,
+    "colorscale": "YlOrRd",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "value_min": null,
+    "value_max": null
+  },
+  "swh": {
+    "min": 0,
+    "max": 3,
+    "colorscale": "Blues",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "value_min": null,
+    "value_max": null
+  },
+  "mwd_u": {
+    "min": -1,
+    "max": 1,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "value_min": null,
+    "value_max": null
+  },
+  "mwd_v": {
+    "min": -1,
+    "max": 1,
+    "colorscale": "RdBu_r",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "value_min": null,
+    "value_max": null
+  },
+  "mwd": {
+    "min": 0,
+    "max": 360,
+    "colorscale": "Blues",
+    "color_min": null,
+    "color_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "value_min": null,
+    "value_max": null
+  },
+  "visible_layers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "region": [
+    100,
+    159.875,
+    0,
+    49.875
+  ],
+  "workspace": {
+    "version": 1,
+    "analysis_collapsed": false,
+    "active_panel": "right",
+    "panels": {
+      "left": {
+        "enabled": true,
+        "view_type": "volume3d",
+        "variable": "temp",
+        "mode": "transect",
+        "date": null,
+        "depth_m": 266.040039,
+        "quiver_step": 18,
+        "play_interval": 1,
+        "visible_layers": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19
+        ],
+        "region": [
+          100,
+          159.875,
+          0,
+          49.875
+        ],
+        "variables": {
+          "ss": {
+            "min": 1447.37,
+            "max": 1540,
+            "colorscale": "Viridis",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": 0.49,
+            "depth_max": 500,
+            "value_min": null,
+            "value_max": null
+          },
+          "temp": {
+            "min": 0,
+            "max": 35,
+            "colorscale": "RdYlBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": 0.49,
+            "depth_max": 644.01,
+            "value_min": null,
+            "value_max": null
+          },
+          "salt": {
+            "min": 30,
+            "max": 35,
+            "colorscale": "Blues",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": 0.49,
+            "depth_max": 500,
+            "value_min": 30,
+            "value_max": 35
+          },
+          "uo": {
+            "min": -1.5,
+            "max": 1.5,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "vo": {
+            "min": -1.5,
+            "max": 1.5,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "uv": {
+            "min": 0,
+            "max": 2,
+            "colorscale": "Blues",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": 0.49,
+            "depth_max": 500,
+            "value_min": 0,
+            "value_max": 1
+          },
+          "u10": {
+            "min": -15,
+            "max": 15,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "v10": {
+            "min": -15,
+            "max": 15,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "wind": {
+            "min": 0,
+            "max": 20,
+            "colorscale": "YlOrRd",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "swh": {
+            "min": 0,
+            "max": 3,
+            "colorscale": "Blues",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "mwd_u": {
+            "min": -1,
+            "max": 1,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "mwd_v": {
+            "min": -1,
+            "max": 1,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "mwd": {
+            "min": 0,
+            "max": 360,
+            "colorscale": "Blues",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          }
+        }
+      },
+      "right": {
+        "enabled": true,
+        "view_type": "layer2d",
+        "variable": "temp",
+        "mode": "transect",
+        "date": null,
+        "depth_m": 9.572997,
+        "quiver_step": 10,
+        "play_interval": 3,
+        "visible_layers": [
+          0,
+          12,
+          19
+        ],
+        "region": [
+          100,
+          159.875,
+          0,
+          49.875
+        ],
+        "variables": {
+          "ss": {
+            "min": 1447.37,
+            "max": 1540,
+            "colorscale": "Viridis",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": 0.49,
+            "depth_max": 500,
+            "value_min": null,
+            "value_max": null
+          },
+          "temp": {
+            "min": 0,
+            "max": 35,
+            "colorscale": "RdYlBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": 0.49,
+            "depth_max": 500,
+            "value_min": null,
+            "value_max": null
+          },
+          "salt": {
+            "min": 30,
+            "max": 35,
+            "colorscale": "Blues",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": 0.49,
+            "depth_max": 500,
+            "value_min": 30,
+            "value_max": 35
+          },
+          "uo": {
+            "min": -1.5,
+            "max": 1.5,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "vo": {
+            "min": -1.5,
+            "max": 1.5,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "uv": {
+            "min": 0,
+            "max": 2,
+            "colorscale": "Blues",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": 0.49,
+            "depth_max": 500,
+            "value_min": 0,
+            "value_max": 1
+          },
+          "u10": {
+            "min": -15,
+            "max": 15,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "v10": {
+            "min": -15,
+            "max": 15,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "wind": {
+            "min": 0,
+            "max": 20,
+            "colorscale": "YlOrRd",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "swh": {
+            "min": 0,
+            "max": 3,
+            "colorscale": "Blues",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "mwd_u": {
+            "min": -1,
+            "max": 1,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "mwd_v": {
+            "min": -1,
+            "max": 1,
+            "colorscale": "RdBu_r",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          },
+          "mwd": {
+            "min": 0,
+            "max": 360,
+            "colorscale": "Blues",
+            "color_min": null,
+            "color_max": null,
+            "depth_min": null,
+            "depth_max": null,
+            "value_min": null,
+            "value_max": null
+          }
+        }
+      }
+    },
+    "linked_3d2d": false,
+    "linked_snapshot": null,
+    "last_3d_variable": "temp"
+  }
+}

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
-
 from .figure import make_volume_fig
 
 
@@ -11,9 +9,7 @@ def ensure_volume(runtime, variable: str):
     """Return the cached default volume figure for a single-frame session."""
     key = f"volume_{variable}"
     if key not in runtime.state:
-        data = runtime.get_data(variable)
-        if isinstance(data, tuple):
-            data = np.sqrt(data[0] ** 2 + data[1] ** 2)
+        data = runtime.get_scalar_data(variable)
         runtime.state[key] = make_volume_fig(
             data,
             runtime.state["lats"],
@@ -24,4 +20,3 @@ def ensure_volume(runtime, variable: str):
             vmax=runtime.state.get(f"{variable}_max"),
         )
     return runtime.state[key]
-

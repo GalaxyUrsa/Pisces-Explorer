@@ -48,5 +48,8 @@ class SessionStore:
             "comparison_series",
             "comparison_labels",
             "comparison_files",
+            "dataset_manifest",
+            "session_label",
+            "region_layer_cache",
         ):
             self._data.pop(key, None)

@@ -1,13 +1,18 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
 from backend.comparison import (
     build_layer_comparison,
     comparison_data,
+    pair_frames,
     pair_series,
+    single_comparison_label,
     unchanged_dates,
 )
+from backend.features.dataset.router import get_dates
 from backend.features.profile.figure import make_profile_fig
 from backend.features.transect.figure import make_transect_fig
 
@@ -25,6 +30,67 @@ def _frame(date: str, value: float) -> dict:
 
 
 class ComparisonTests(unittest.TestCase):
+    def test_single_frames_can_be_paired_without_enabling_series(self):
+        pair = pair_frames(
+            _frame("20260101", 1),
+            _frame("20260101", 2),
+            "20260101",
+        )
+        fake_runtime = SimpleNamespace(
+            is_comparison=True,
+            state={
+                "series_dates": ["20260101"],
+                "comparison_files": [{
+                    "date": "20260101",
+                    "a": "prediction_20260101.nc",
+                    "b": "target_20260101.nc",
+                }],
+            },
+        )
+
+        with patch("backend.features.dataset.router.runtime", fake_runtime):
+            dates = get_dates()
+
+        self.assertEqual(pair["date"], "20260101")
+        self.assertEqual(pair["source_dates"]["a"], "20260101")
+        self.assertEqual(pair["source_dates"]["b"], "20260101")
+        self.assertTrue(dates["is_comparison"])
+        self.assertFalse(dates["is_series"])
+        self.assertEqual(dates["dates"], ["20260101"])
+
+    def test_single_comparison_label_supports_cross_date_pairs(self):
+        self.assertEqual(
+            single_comparison_label(
+                "prediction_20260101.nc",
+                "target_20260101.nc",
+            ),
+            "20260101",
+        )
+        self.assertEqual(
+            single_comparison_label("prediction.nc", "target.nc"),
+            "单日",
+        )
+        self.assertEqual(
+            single_comparison_label(
+                "prediction_20260101.nc",
+                "target_20260102.nc",
+            ),
+            "20260101 vs 20260102",
+        )
+
+    def test_cross_date_pair_preserves_each_source_date(self):
+        frame_a = _frame("20260101 vs 20260102", 1)
+        frame_b = _frame("20260101 vs 20260102", 2)
+        frame_a["filename"] = "prediction_20260101.nc"
+        frame_b["filename"] = "target_20260102.nc"
+
+        pair = pair_frames(frame_a, frame_b, "20260101 vs 20260102")
+
+        self.assertEqual(pair["source_dates"], {
+            "a": "20260101",
+            "b": "20260102",
+        })
+
     def test_pair_series_keeps_b_frames_aligned_by_date(self):
         pairs = pair_series(
             [_frame("20260102", 2), _frame("20260101", 1)],
@@ -63,6 +129,39 @@ class ComparisonTests(unittest.TestCase):
         self.assertTrue(
             all(len(figure["data"]) == 2 for figure in first["figures"].values())
         )
+
+    def test_composite_current_comparison_keeps_vector_arrows(self):
+        frame_a = _frame("20260101", 1)
+        frame_b = _frame("20260101", 2)
+        frame_a["uo"] = np.full_like(frame_a["temp"], 1.0)
+        frame_a["vo"] = np.full_like(frame_a["temp"], 0.5)
+        frame_b["uo"] = np.full_like(frame_b["temp"], 0.25)
+        frame_b["vo"] = np.full_like(frame_b["temp"], 0.1)
+        pair = {"date": "20260101", "a": frame_a, "b": frame_b}
+
+        def get_data(variable, frame):
+            if variable == "uv":
+                return frame["uo"], frame["vo"]
+            return frame[variable]
+
+        result = build_layer_comparison(
+            pair,
+            variable="uv",
+            depth_idx=0,
+            is_2d=False,
+            points=[],
+            get_data=get_data,
+            vmin=0,
+            vmax=2,
+            colorscale="Viridis",
+            quiver_step=2,
+        )
+
+        for source in ("a", "b", "difference"):
+            traces = result["figures"][source]["data"]
+            self.assertEqual(len(traces), 3)
+            self.assertEqual(traces[1]["mode"], "lines")
+            self.assertEqual(traces[2]["marker"]["symbol"], "arrow")
 
     def test_unchanged_b_frames_are_reported(self):
         first_b = _frame("20260101", 10)

@@ -9,7 +9,7 @@ const VAR_DEFAULTS = VariableRegistry.configurableDefaults;
 const COLORSCALES = VariableRegistry.colorscales;
 const PLOTLY_CONFIG = PlotlyConfig.chart;
 const PLOTLY_CONFIG_MAP = PlotlyConfig.map;
-const apiFetch = ApiClient.fetchJson;
+const apiFetch = PlaybackCache.fetchJson;
 
 
 function setClickInfo(text) {
@@ -18,7 +18,14 @@ function setClickInfo(text) {
 
 
 function setProfileTitle(text) {
-  document.getElementById("profile-panel-title").textContent = text;
+  const title = document.getElementById("profile-panel-title");
+  title.textContent = text;
+  title.title = text;
+  const badge = document.getElementById("analysis-source-badge");
+  if (!badge) return;
+  const labels = { a: "序列 A", b: "序列 B", difference: "差值 A−B" };
+  badge.textContent = labels[state.comparisonSource] || "";
+  badge.classList.toggle("hidden", !state.isComparison);
 }
 
 
@@ -47,6 +54,29 @@ function handleExpiredData(error) {
   return true;
 }
 
+function playbackRequests(dateIndex) {
+  const requests = PanelController.playbackRequests(dateIndex);
+  if (!state.points.length || state.varType === "2d") return requests;
+  if (state.mode === "point") {
+    requests.push(ProfileView.request(state, dateIndex));
+  } else if (state.points.length >= 2) {
+    requests.push(TransectView.request(state, dateIndex));
+  }
+  return requests;
+}
+
+
+async function preparePlayback(onProgress, shouldContinue) {
+  const frameRequests = state.dates.map(
+    (_date, dateIndex) => playbackRequests(dateIndex)
+  );
+  return PlaybackCache.preloadFrames(
+    frameRequests,
+    onProgress,
+    shouldContinue,
+  );
+}
+
 
 async function initMainScreen() {
   return WorkspaceController.initialize({
@@ -63,6 +93,7 @@ async function initMainScreen() {
     initializePanels,
     onDepthChange,
     onDateChange,
+    preparePlayback,
     emptyFigure,
     setProfileTitle,
   });
@@ -70,7 +101,7 @@ async function initMainScreen() {
 
 
 async function renderVolume() {
-  return PanelController.renderAll();
+  return PanelController.renderActive();
 }
 
 
@@ -83,26 +114,28 @@ function initializePanels() {
     onDepthChange,
     renderProfile,
     handleExpiredData,
+    onActivate: WorkspaceController.syncActivePanel,
   });
 }
 
 
 async function renderLayer(depthIndex, points = []) {
-  return PanelController.renderAll();
+  return PanelController.renderActive();
 }
 
 
 async function renderProfile() {
   if (!state.meta) return;
+  PiscesUIEvents.panel(state);
   const loading = document.getElementById("profile-loading");
   if (loading && !state.playing) loading.classList.remove("hidden");
   try {
     if (!state.points.length) {
-      renderEmptyAnalysis();
+      await renderEmptyAnalysis();
       return;
     }
     if (state.varType === "2d") {
-      renderSurfaceVariableInfo();
+      await renderSurfaceVariableInfo();
       return;
     }
     if (state.mode === "point") {
@@ -116,7 +149,7 @@ async function renderProfile() {
       return;
     }
     if (state.points.length < 2) {
-      renderWaitingForSecondPoint();
+      await renderWaitingForSecondPoint();
       return;
     }
     await TransectView.render({
@@ -132,7 +165,7 @@ async function renderProfile() {
 }
 
 
-function renderEmptyAnalysis() {
+async function renderEmptyAnalysis() {
   const modeName = (
     state.mode === "point" ? "单点垂直剖面" : "两点垂直断面"
   );
@@ -141,39 +174,32 @@ function renderEmptyAnalysis() {
       ? "请在上方地图选择一个位置"
       : "请在上方地图依次选择 P1 和 P2"
   );
-  Plotly.react("profile-graph", empty.data, empty.layout, PLOTLY_CONFIG);
-  const sourceLabel = (
-    state.comparisonSource === "a" ? "序列 A"
-      : state.comparisonSource === "b" ? "序列 B"
-        : "差值 A − B"
+  await Plotly.react(
+    "profile-graph", empty.data, empty.layout, PLOTLY_CONFIG
   );
-  setProfileTitle(
-    state.isComparison
-      ? `${modeName}对比 · 当前展示 ${sourceLabel}`
-      : modeName
-  );
+  setProfileTitle(modeName);
   setClickInfo("");
 }
 
 
-function renderSurfaceVariableInfo() {
+async function renderSurfaceVariableInfo() {
   const point = state.points[state.points.length - 1];
   const label = VAR_LABELS[state.variable] || state.variable;
   const empty = emptyFigure(`${label} 为表面层变量，无垂直剖面`);
-  Plotly.react("profile-graph", empty.data, empty.layout, PLOTLY_CONFIG);
+  await Plotly.react(
+    "profile-graph", empty.data, empty.layout, PLOTLY_CONFIG
+  );
   setProfileTitle(`${label} · 表面层`);
   setClickInfo(`${point.lat.toFixed(3)}°N, ${point.lon.toFixed(3)}°E`);
 }
 
 
-function renderWaitingForSecondPoint() {
+async function renderWaitingForSecondPoint() {
   const empty = emptyFigure("请在上方地图再选择一个位置作为 P2");
-  Plotly.react("profile-graph", empty.data, empty.layout, PLOTLY_CONFIG);
-  setProfileTitle(
-    state.isComparison
-      ? "两点垂直断面对比 · 等待选择 P2"
-      : "两点垂直断面 · 等待选择 P2"
+  await Plotly.react(
+    "profile-graph", empty.data, empty.layout, PLOTLY_CONFIG
   );
+  setProfileTitle("两点垂直断面 · 等待选择 P2");
   const firstPoint = state.points[0];
   setClickInfo(
     `P1: ${firstPoint.lat.toFixed(2)}°N, `
@@ -206,12 +232,33 @@ function emptyFigure(message) {
 }
 
 
-async function onDepthChange(depthIndex) {
-  state.depthIdx = depthIndex;
+async function onDepthChange(depthIndex, slotId = null) {
+  const linkedDepthClick = state.linked3d2d && slotId === "left";
+  if (slotId && slotId !== state.activeAnalysisSlot && !linkedDepthClick) {
+    SessionStore.activate(slotId);
+    await WorkspaceController.syncActivePanel();
+  }
+  if (state.playing || state.preparingPlayback) {
+    await TimelineController.stop({ waitForActive: true });
+  }
+  const depthSource = slotId || state.activeAnalysisSlot;
+  SessionStore.forPanel(depthSource).depthIdx = depthIndex;
+  if (state.linked3d2d) {
+    SessionStore.syncLinked(depthSource, ["depthIdx"]);
+  }
+  await RangeControls.save(apiFetch);
   const total = state.meta.depths.length;
   document.getElementById(
     "depth-index"
   ).textContent = `第 ${depthIndex + 1} / ${total} 层`;
+  PiscesUIEvents.panel(state);
+  if (state.linked3d2d) {
+    await PanelController.renderSlot("right");
+    return;
+  }
+  const activeSlot = state.activeAnalysisSlot;
+  const activeView = state.panelSlots[activeSlot]?.viewType;
+  if (PanelRegistry.definitions[activeView]?.volume) return;
   await Promise.all([
     renderLayer(depthIndex, state.points),
     renderProfile(),
@@ -221,10 +268,16 @@ async function onDepthChange(depthIndex) {
 
 async function onDateChange(dateIndex) {
   state.dateIdx = dateIndex;
+  if (state.linked3d2d) {
+    SessionStore.syncLinked(state.activeAnalysisSlot, ["dateIdx"]);
+  }
   document.getElementById("date-index").textContent = `第 ${dateIndex + 1} 帧`;
   document.getElementById("date-select").value = dateIndex;
   document.getElementById("date-slider").value = dateIndex;
-  await renderLayer(state.depthIdx, state.points);
+  await RangeControls.save(apiFetch);
+  PiscesUIEvents.panel(state);
+  if (state.linked3d2d) await PanelController.renderAll();
+  else await renderLayer(state.depthIdx, state.points);
   await renderProfile();
 }
 
@@ -239,29 +292,26 @@ function stopPlayback() {
 }
 
 
-document.addEventListener("DOMContentLoaded", () => {
+let explorerApplicationInitialized = false;
+
+function initializeExplorerApplication() {
+  if (explorerApplicationInitialized) return;
+  explorerApplicationInitialized = true;
   UploadController.init();
-  SidebarController.initialize();
-  SidebarSections.initialize();
+  if (!document.getElementById("explorer-vue-sidebar")) {
+    SidebarController.initialize();
+    SidebarSections.initialize();
+  }
   PanelResizer.initAll();
 
-  fetch("/api/status")
-    .then(response => response.json())
+  ApiClient.fetchJson("/api/status")
     .then(async status => {
-      if (!status.ready) {
-        UploadController.showEmptyWorkspace();
-        return;
-      }
-      UploadController.showWorkspace();
-      document.getElementById(
-        "loaded-filename"
-      ).textContent = "（命令行预加载）";
-      const detectedMode = document.getElementById("detected-load-mode");
-      detectedMode.textContent = "当前使用命令行预加载数据";
-      detectedMode.classList.add("valid");
-      await new Promise(resolve => {
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
-      });
-      await initMainScreen();
+      await UploadController.restoreSession(status);
     });
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeExplorerApplication);
+} else {
+  initializeExplorerApplication();
+}

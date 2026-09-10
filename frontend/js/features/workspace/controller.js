@@ -2,6 +2,8 @@
  * Load one analysis session and compose its independent UI controllers.
  */
 const WorkspaceController = (() => {
+  let activeControlContext = null;
+
   function setText(id, text) {
     const element = document.getElementById(id);
     if (element) element.textContent = text;
@@ -36,22 +38,17 @@ const WorkspaceController = (() => {
     state.comparisonFiles = series.comparison_files || [];
     state.dates = series.dates;
     state.dateIdx = 0;
-    state.points = [];
-    state.pointsByMode = { point: [], transect: [] };
-    state.depthIdx = 0;
-    const savedVariable = sessionStorage.getItem("lastVariable");
-    state.variable = (
-      savedVariable && defaults[savedVariable] ? savedVariable : "ss"
-    );
-    state.varType = metadata.vars_2d.includes(state.variable) ? "2d" : "3d";
-    state.isVector = (
-      metadata.vars_vector.includes(state.variable)
-      || state.variable === "mwd"
-    );
-    state.quiverStep = 20;
-    state.depthRange = null;
-    state.valueRange = null;
-    state.comparisonSource = "a";
+    state.configLoaded = false;
+    ["left", "right"].forEach(slotId => {
+      const panel = SessionStore.forPanel(slotId);
+      panel.points = [];
+      panel.pointsByMode = { point: [], transect: [] };
+      panel.depthIdx = 0;
+      panel.dateIdx = 0;
+      panel.depthRange = null;
+      panel.valueRange = null;
+      panel.comparisonSource = "a";
+    });
   }
 
   function updateMetadata(metadata) {
@@ -67,6 +64,18 @@ const WorkspaceController = (() => {
     );
     setText("meta-depths", `${metadata.depths.length} 层`);
     setText("meta-grid", metadata.grid_shape?.join(" × ") || "--");
+    const displayGridItem = document.getElementById("meta-display-grid-item");
+    if (displayGridItem) {
+      const hasDisplayGrid = Number.isFinite(metadata.display_resolution_km);
+      setText("meta-grid-label", hasDisplayGrid ? "原始网格" : "网格尺寸");
+      displayGridItem.classList.toggle("hidden", !hasDisplayGrid);
+      setText(
+        "meta-display-grid",
+        hasDisplayGrid
+          ? `${metadata.display_resolution_km} km 插值 · ${metadata.display_grid_shape.join(" × ")}`
+          : "--"
+      );
+    }
     setText("depth-index", `第 1 / ${metadata.depths.length} 层`);
     setText("depth-total", `共 ${metadata.depths.length} 层`);
   }
@@ -85,6 +94,7 @@ const WorkspaceController = (() => {
     initializePanels,
     onDepthChange,
     onDateChange,
+    preparePlayback,
     emptyFigure,
     setProfileTitle,
   }) {
@@ -98,12 +108,13 @@ const WorkspaceController = (() => {
       renderLayer,
       renderProfile,
       onDragStart: TimelineController.stop,
+      onRegionSelected: region => RegionControls.applyRegion(region, "map"),
     });
 
     renderComparisonFiles(state);
     updateMetadata(metadata);
 
-    const visualizationControls = await VisualizationControls.initialize({
+    activeControlContext = {
       state,
       apiFetch,
       defaults,
@@ -113,31 +124,63 @@ const WorkspaceController = (() => {
       renderVolume,
       renderLayer,
       renderProfile,
-    });
-    AnalysisControls.initialize({
-      state,
       onDepthChange,
-      renderLayer,
-      renderProfile,
-    });
-    TimelineController.setup(
-      state.isSeries ? state.dates : [],
-      onDateChange
-    );
-
-    await renderLayer(0);
-    visualizationControls.applyDimensionMode();
+      onDateChange,
+      preparePlayback,
+    };
+    await syncActivePanel();
+    PanelController.refreshSelectors();
+    await PanelController.renderAll();
     const empty = emptyFigure("请在上方地图选择一个位置");
     Plotly.newPlot(
       "profile-graph", empty.data, empty.layout, plotConfig
     );
     setProfileTitle(
-      state.isComparison
-        ? "单点垂直剖面对比 · 当前展示序列 A"
-        : "单点垂直剖面"
+      "单点垂直剖面"
     );
     MapSelection.initDrag();
+
+    const collapseButton = document.getElementById("analysis-collapse");
+    collapseButton.onclick = async () => {
+      state.analysisCollapsed = !state.analysisCollapsed;
+      applyAnalysisCollapse(state);
+      await RangeControls.save(apiFetch);
+    };
   }
 
-  return { initialize };
+  function applyAnalysisCollapse(state) {
+    const panel = document.getElementById("analysis-panel");
+    const button = document.getElementById("analysis-collapse");
+    panel.classList.toggle("collapsed", state.analysisCollapsed);
+    document.querySelector(".charts-col")?.classList.toggle(
+      "analysis-collapsed", state.analysisCollapsed
+    );
+    button.textContent = state.analysisCollapsed ? "展开" : "收起";
+    button.setAttribute("aria-expanded", String(!state.analysisCollapsed));
+    requestAnimationFrame(PanelSlot.resizeVisible);
+  }
+
+  async function syncActivePanel() {
+    if (!activeControlContext) return;
+    const { state } = activeControlContext;
+    const visualizationControls = await VisualizationControls.initialize(
+      activeControlContext
+    );
+    AnalysisControls.initialize(activeControlContext);
+    RegionControls.initialize(activeControlContext);
+    TimelineController.setup(
+      state.isSeries ? state.dates : [],
+      activeControlContext.onDateChange,
+      activeControlContext.onDateChange,
+      activeControlContext.preparePlayback
+    );
+    visualizationControls.applyDimensionMode();
+    const total = state.meta.depths.length;
+    setText("depth-index", `第 ${state.depthIdx + 1} / ${total} 层`);
+    applyAnalysisCollapse(state);
+    PiscesUIEvents.panel(state);
+    await activeControlContext.renderProfile();
+  }
+
+  return { initialize, syncActivePanel };
 })();

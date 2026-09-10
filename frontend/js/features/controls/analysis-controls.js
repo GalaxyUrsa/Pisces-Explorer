@@ -1,5 +1,5 @@
 /**
- * Depth, point/transect mode and comparison-source controls.
+ * Depth and point/transect mode controls.
  */
 const AnalysisControls = (() => {
   let eventController = null;
@@ -22,16 +22,17 @@ const AnalysisControls = (() => {
   }
 
   function updateModeTabs(state) {
-    document.getElementById("analysis-tab-point")?.classList.toggle(
-      "active", state.mode === "point"
-    );
-    document.getElementById("analysis-tab-transect")?.classList.toggle(
-      "active", state.mode === "transect"
-    );
+    ["point", "transect"].forEach(mode => {
+      const button = document.getElementById(`analysis-tab-${mode}`);
+      const active = state.mode === mode;
+      button?.classList.toggle("active", active);
+      button?.setAttribute("aria-pressed", String(active));
+    });
   }
 
   function initialize({
     state,
+    apiFetch,
     onDepthChange,
     renderLayer,
     renderProfile,
@@ -39,19 +40,6 @@ const AnalysisControls = (() => {
     eventController?.abort();
     eventController = new AbortController();
     const listenerOptions = { signal: eventController.signal };
-    const comparisonControl = document.getElementById(
-      "comparison-analysis-control"
-    );
-    const comparisonSource = document.getElementById(
-      "comparison-analysis-source"
-    );
-    comparisonControl.classList.toggle("hidden", !state.isComparison);
-    comparisonSource.value = state.comparisonSource;
-    comparisonSource.onchange = () => {
-      state.comparisonSource = comparisonSource.value;
-      renderProfile();
-    };
-
     const depthSelect = document.getElementById("depth-select");
     const depthSlider = document.getElementById("depth-slider");
     depthSelect.innerHTML = "";
@@ -63,7 +51,8 @@ const AnalysisControls = (() => {
     });
     depthSlider.min = 0;
     depthSlider.max = state.meta.depths.length - 1;
-    depthSlider.value = 0;
+    depthSlider.value = state.depthIdx;
+    depthSelect.value = state.depthIdx;
 
     let depthDebounceTimer = null;
     depthSelect.addEventListener("change", () => {
@@ -78,39 +67,34 @@ const AnalysisControls = (() => {
       depthDebounceTimer = setTimeout(() => onDepthChange(index), 120);
     }, listenerOptions);
 
-    document.querySelectorAll('input[name="mode"]').forEach(radio => {
-      radio.checked = radio.value === "point";
-      radio.addEventListener("change", () => {
-        state.pointsByMode[state.mode] = state.points.map(point => ({
-          ...point,
-        }));
-        state.mode = radio.value;
-        state.points = state.pointsByMode[state.mode].map(point => ({
-          ...point,
-        }));
-        document.getElementById("mode-point").classList.toggle(
-          "active", state.mode === "point"
-        );
-        document.getElementById("mode-transect").classList.toggle(
-          "active", state.mode === "transect"
-        );
-        updateValueRangeVisibility(state);
-        updateModeTabs(state);
-        renderLayer(state.depthIdx, state.points);
-        renderProfile();
-      }, listenerOptions);
-    });
-    state.mode = "point";
+    async function selectMode(mode) {
+      if (state.mode === mode) return;
+      TimelineController.stop();
+      state.pointsByMode[state.mode] = state.points.map(point => ({
+        ...point,
+      }));
+      state.mode = mode;
+      state.points = state.pointsByMode[state.mode].map(point => ({
+        ...point,
+      }));
+      updateValueRangeVisibility(state);
+      updateModeTabs(state);
+      PiscesUIEvents.panel(state);
+      await RangeControls.save(apiFetch);
+      await renderLayer(state.depthIdx, state.points);
+      await renderProfile();
+    }
     updateValueRangeVisibility(state);
     updateModeTabs(state);
     document.getElementById("analysis-tab-point").onclick = () => {
-      document.querySelector('input[name="mode"][value="point"]').click();
+      void selectMode("point");
     };
     document.getElementById("analysis-tab-transect").onclick = () => {
-      document.querySelector('input[name="mode"][value="transect"]').click();
+      void selectMode("transect");
     };
 
     document.getElementById("clear-btn").onclick = () => {
+      TimelineController.stop();
       state.points = [];
       state.pointsByMode[state.mode] = [];
       renderLayer(state.depthIdx, []);

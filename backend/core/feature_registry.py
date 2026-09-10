@@ -23,6 +23,24 @@ FEATURE_REGISTRY = {
             ("single", "series", "comparison"),
         ),
         FeatureSpec(
+            "simulator",
+            "Ocean Simulator",
+            "backend.features.simulator.router",
+            ("single",),
+        ),
+        FeatureSpec(
+            "inference",
+            "Model Inference",
+            "backend.features.inference.router",
+            ("series",),
+        ),
+        FeatureSpec(
+            "hub",
+            "Pisces-Hub History",
+            "backend.features.hub.router",
+            ("single", "series"),
+        ),
+        FeatureSpec(
             "volume",
             "三维分层",
             "backend.features.volume.router",

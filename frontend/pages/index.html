@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pisces-Explorer</title>
-  <link rel="stylesheet" href="/static/style.css?v=17" />
+  <link rel="stylesheet" href="/static/style.css?v=27" />
   <script src="/static/plotly.min.js?v=6.7.0"></script>
 </head>
 <body>
@@ -27,6 +27,7 @@
 
       <!-- 左侧边栏 -->
       <div class="sidebar">
+        <div id="sidebar-vue-context"></div>
         <nav
           id="sidebar-rail-nav"
           class="sidebar-rail-nav"
@@ -38,36 +39,54 @@
             <span class="brand-icon">🌊</span>
             <span class="brand-text">Pisces-Explorer</span>
           </h1>
-          <div class="side-card-title data-source-title">📂 数据加载</div>
-          <label class="unified-file-picker">
-            <span class="dataset-badge">A</span>
-            <span class="dataset-picker-text">
-              <strong>数据集 A</strong>
-              <small>1 个文件为单帧，多个文件为时间序列</small>
-            </span>
-            <input type="file" id="dataset-a-input" accept=".nc" multiple hidden />
-          </label>
-          <details id="dataset-a-files" class="selected-file-list">
-            <summary>尚未选择文件</summary>
-          </details>
-          <label class="unified-file-picker optional-picker">
-            <span class="dataset-badge dataset-badge-b">B</span>
-            <span class="dataset-picker-text">
-              <strong>数据集 B（可选）</strong>
-              <small>与 A 一起构成双序列对比</small>
-            </span>
-            <input type="file" id="dataset-b-input" accept=".nc" multiple hidden />
-          </label>
-          <details id="dataset-b-files" class="selected-file-list">
-            <summary>未选择，不进行双序列对比</summary>
-          </details>
-          <div class="data-load-actions">
-            <button id="load-data-btn" class="play-btn" disabled>加载数据</button>
-            <button id="reload-btn" class="reload-btn">清空</button>
+          <section id="current-session-summary" class="current-session-summary hidden">
+            <div class="current-session-heading">
+              <strong>当前已加载</strong>
+              <span id="current-session-mode"></span>
+            </div>
+            <div id="current-dataset-a" class="current-dataset-row"></div>
+            <div id="current-dataset-b" class="current-dataset-row hidden"></div>
+            <div id="current-session-dates" class="current-session-dates"></div>
+            <div class="current-session-actions">
+              <button type="button" id="replace-data-btn" class="range-btn">重新选择数据</button>
+              <button type="button" id="reload-btn" class="text-danger-btn">清空当前数据</button>
+            </div>
+          </section>
+          <div id="dataset-replacement-editor">
+          <div class="data-source-heading">
+            <strong id="data-editor-title">数据加载</strong>
+            <small>选择 1 个 NetCDF 文件为单帧，选择多个为时间序列</small>
           </div>
-          <div id="detected-load-mode" class="detected-load-mode">请选择数据集 A</div>
+          <section class="dataset-select-block" id="dataset-a-section">
+            <div class="dataset-select-heading"><strong>数据集 A</strong><span>必选</span></div>
+            <label class="dataset-file-control" id="dataset-a-picker">
+              <span class="dataset-file-summary" id="dataset-a-summary">尚未选择文件</span>
+              <span class="dataset-file-action" id="dataset-a-action">选择文件</span>
+              <input type="file" id="dataset-a-input" accept=".nc" multiple hidden />
+            </label>
+            <details id="dataset-a-files" class="dataset-file-details hidden"></details>
+          </section>
+          <button type="button" id="add-dataset-b" class="add-comparison-btn">＋ 添加对比数据集 B</button>
+          <section class="dataset-select-block hidden" id="dataset-b-section">
+            <div class="dataset-select-heading">
+              <strong>数据集 B</strong><span>对比</span>
+              <button type="button" id="remove-dataset-b" class="remove-dataset-btn">移除 B</button>
+            </div>
+            <label class="dataset-file-control" id="dataset-b-picker">
+              <span class="dataset-file-summary" id="dataset-b-summary">尚未选择文件</span>
+              <span class="dataset-file-action" id="dataset-b-action">选择文件</span>
+              <input type="file" id="dataset-b-input" accept=".nc" multiple hidden />
+            </label>
+            <details id="dataset-b-files" class="dataset-file-details hidden"></details>
+            <p class="comparison-picker-help">A、B 各选 1 个文件，或各选至少 2 个文件组成时间序列</p>
+          </section>
           <div id="upload-status" class="upload-status"></div>
-          <div id="loaded-filename" class="loaded-filename"></div>
+          <div class="data-load-actions">
+            <button id="load-data-btn" class="play-btn" disabled>请选择数据</button>
+            <button id="cancel-replace-btn" class="reload-btn hidden">取消</button>
+          </div>
+          </div>
+          <div id="loaded-filename" class="loaded-filename hidden"></div>
         </div>
 
         <div class="side-card" data-section="overview">
@@ -86,8 +105,12 @@
               <div class="meta-value" id="meta-depths">--</div>
             </div>
             <div class="meta-item">
-              <div class="meta-label">网格尺寸</div>
+              <div class="meta-label" id="meta-grid-label">网格尺寸</div>
               <div class="meta-value" id="meta-grid">--</div>
+            </div>
+            <div class="meta-item hidden" id="meta-display-grid-item">
+              <div class="meta-label">2D 显示</div>
+              <div class="meta-value" id="meta-display-grid">--</div>
             </div>
           </div>
         </div>
@@ -101,7 +124,7 @@
         </div>
 
         <div class="side-card" data-section="variables" data-default-open="true">
-          <div class="side-card-title">🎛️ 变量选择</div>
+          <div class="side-card-title">视图与变量</div>
 
           <!-- 3D 变量分组 -->
           <div class="var-group">
@@ -193,8 +216,7 @@
           </div>
         </div>
 
-        <div class="side-card" data-section="colors" data-default-open="true">
-          <div class="side-card-title">🎨 色标范围</div>
+        <div class="side-card" data-section="color-range">
           <div class="cbar-range-sidebar">
             <input type="number" class="range-input" id="cmin" placeholder="min" />
             <span class="range-sep">–</span>
@@ -206,33 +228,29 @@
             <div class="dual-range-thumb" id="cbar-thumb-min"></div>
             <div class="dual-range-thumb" id="cbar-thumb-max"></div>
           </div>
+        </div>
+
+        <div class="side-card" data-section="palette">
           <div class="cbar-colorscale-row">
             <span class="range-label">预设</span>
             <select id="colorscale-select" class="colorscale-select"></select>
           </div>
-          <div class="custom-color-row">
-            <span class="range-label">自定义</span>
-            <div class="color-pair">
-              <input type="color" id="color-min-swatch" class="color-swatch" value="#0000ff" />
-              <input type="text"  id="color-min-hex"    class="color-hex" maxlength="7" placeholder="#rrggbb" />
-              <span class="range-label" style="margin:0 4px">→</span>
-              <input type="color" id="color-max-swatch" class="color-swatch" value="#ff0000" />
-              <input type="text"  id="color-max-hex"    class="color-hex" maxlength="7" placeholder="#rrggbb" />
-            </div>
-          </div>
+        </div>
 
-          <!-- 矢量密度（仅矢量变量显示） -->
+        <div class="side-card" data-section="vectors">
           <div id="quiver-density-row" class="hidden" style="margin-top:10px">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="range-label">矢量密度</span>
               <input type="range" id="quiver-step" min="10" max="40" value="20" class="depth-slider" style="flex:1" />
-              <span class="range-label" id="quiver-step-label">步长 20</span>
+              <span class="range-label">步长</span>
+              <input type="number" id="quiver-step-input" min="1" max="40" value="20" step="1" class="range-input quiver-step-input" />
             </div>
+            <div id="quiver-effective-info" class="quiver-effective-info"></div>
           </div>
         </div>
 
         <div class="side-card" id="timeline-card" data-section="timeline" style="display:none">
-          <div class="side-card-title">📅 时间序列</div>
+          <div class="side-card-title">时间</div>
           <select class="depth-select" id="date-select"></select>
           <div class="depth-info">
             <span id="date-index">第 1 帧</span>
@@ -253,7 +271,7 @@
         </div>
 
         <div class="side-card" data-section="depth">
-          <div class="side-card-title">📏 深度层</div>
+          <div class="side-card-title">深度</div>
           <select class="depth-select" id="depth-select"></select>
           <div class="depth-info">
             <span id="depth-index">第 -- 层</span>
@@ -262,8 +280,9 @@
           <div class="depth-slider-wrap">
             <input type="range" class="depth-slider" id="depth-slider" min="0" max="19" value="0" />
           </div>
+        </div>
 
-          <!-- 3D 显示层选择 -->
+        <div class="side-card" data-section="layer-visibility">
           <div class="var-group" style="margin-top:10px" id="layer-vis-group">
             <div class="var-group-header" data-group="layer-vis">
               <span class="var-group-arrow">▶</span>
@@ -281,25 +300,21 @@
           </div>
         </div>
 
-        <div class="side-card" data-section="analysis-mode">
-          <div class="side-card-title">🖱️ 交互模式</div>
-          <div class="mode-list">
-            <label class="mode-item active" id="mode-point">
-              <input type="radio" name="mode" value="point" checked />
-              <span class="mode-text">单点垂直剖面</span>
-            </label>
-            <div class="mode-desc">选择一个经纬度，查看数值随深度的变化</div>
-            <label class="mode-item" id="mode-transect">
-              <input type="radio" name="mode" value="transect" />
-              <span class="mode-text">两点垂直断面</span>
-            </label>
-            <div class="mode-desc">选择 P1、P2，查看连线路径上的深度分布</div>
-          </div>
-        </div>
-
         <div class="side-card" data-section="selection">
-          <div class="side-card-title">选点信息</div>
-          <div class="click-info-card empty" id="map-click-info">在地图上选择位置…</div>
+          <div class="side-card-title">区域信息</div>
+          <div class="region-grid">
+            <label>最小经度<input id="region-lon-min" type="number" step="0.0001" /></label>
+            <label>最大经度<input id="region-lon-max" type="number" step="0.0001" /></label>
+            <label>最小纬度<input id="region-lat-min" type="number" step="0.0001" /></label>
+            <label>最大纬度<input id="region-lat-max" type="number" step="0.0001" /></label>
+          </div>
+          <div class="region-actions">
+            <button class="range-btn" id="region-select-map">在图上框选</button>
+            <button class="range-btn" id="region-apply">应用区域</button>
+            <button class="range-btn" id="region-clear">恢复全域</button>
+          </div>
+          <div id="region-status" class="region-status">当前使用完整数据区域</div>
+          <div class="click-info-card empty" id="map-click-info">区域内尚未选择分析点</div>
         </div>
 
         <button class="clear-btn" id="clear-btn">🗑️ 清除选点</button>
@@ -324,6 +339,8 @@
               <span class="panel-title slot-title">三维场</span>
               <span class="panel-hint slot-source">数据来源：当前数据</span>
               <select class="slot-view-select" aria-label="左窗口视图"></select>
+              <button type="button" class="slot-open-other hidden"></button>
+              <button type="button" class="slot-close" title="关闭左窗口" aria-label="关闭左窗口">×</button>
               <span class="loading-indicator hidden slot-loading">正在加载…</span>
             </div>
             <div class="slot-error hidden"></div>
@@ -335,6 +352,8 @@
               <span class="panel-title slot-title">水平切层</span>
               <span class="panel-hint slot-source">数据来源：当前数据</span>
               <select class="slot-view-select" aria-label="右窗口视图"></select>
+              <button type="button" class="slot-open-other hidden"></button>
+              <button type="button" class="slot-close" title="关闭右窗口" aria-label="关闭右窗口">×</button>
               <span class="loading-indicator hidden slot-loading">正在加载…</span>
             </div>
             <div class="slot-error hidden"></div>
@@ -345,26 +364,21 @@
         <div class="row-resizer" id="row-resizer"></div>
         <section class="panel panel-profile" id="analysis-panel">
           <div class="profile-header">
-            <span id="profile-panel-title" class="panel-hint"></span>
-            <span class="loading-indicator hidden" id="profile-loading" style="margin-left:8px">计算中…</span>
+            <div class="analysis-title-group">
+              <span id="profile-panel-title" class="panel-hint"></span>
+              <span id="analysis-source-badge" class="analysis-source-badge hidden"></span>
+            </div>
             <div class="analysis-tabs" aria-label="分析模式">
               <button id="analysis-tab-point" class="analysis-tab active">单点垂直剖面</button>
               <button id="analysis-tab-transect" class="analysis-tab">两点垂直断面</button>
             </div>
-            <label id="comparison-analysis-control" class="comparison-analysis-control hidden">
-              <span class="comparison-source-label">分析数据来源</span>
-              <select id="comparison-analysis-source">
-                <option value="a">序列 A</option>
-                <option value="b">序列 B</option>
-              </select>
-            </label>
-            <div class="range-controls" style="margin-left:auto">
+            <div class="range-controls">
               <span class="range-label">深度</span>
               <input type="number" id="depth-min" class="range-input" placeholder="min" step="10" />
               <span class="range-sep">–</span>
               <input type="number" id="depth-max" class="range-input" placeholder="max" step="10" />
               <span class="range-unit">m</span>
-              <div class="dual-range-wrap" id="depth-dual-wrap" style="flex:1;min-width:60px;margin:0 4px">
+              <div class="dual-range-wrap analysis-range-slider" id="depth-dual-wrap">
                 <div class="dual-range-track"><div class="dual-range-fill" id="depth-dual-fill"></div></div>
                 <div class="dual-range-thumb" id="depth-thumb-min"></div>
                 <div class="dual-range-thumb" id="depth-thumb-max"></div>
@@ -375,13 +389,15 @@
               <span class="range-sep" id="value-range-sep">–</span>
               <input type="number" id="speed-max" class="range-input" placeholder="max" step="1" />
               <span class="range-unit" id="value-range-unit">m/s</span>
-              <div class="dual-range-wrap" id="value-dual-wrap" style="flex:1;min-width:60px;margin:0 4px">
+              <div class="dual-range-wrap analysis-range-slider" id="value-dual-wrap">
                 <div class="dual-range-track"><div class="dual-range-fill" id="value-dual-fill"></div></div>
                 <div class="dual-range-thumb" id="value-thumb-min"></div>
                 <div class="dual-range-thumb" id="value-thumb-max"></div>
               </div>
               <button id="range-apply-btn" class="range-btn">应用</button>
             </div>
+            <span class="loading-indicator hidden" id="profile-loading">计算中…</span>
+            <button type="button" id="analysis-collapse" class="analysis-collapse" aria-expanded="true">收起</button>
           </div>
           <div id="analysis-unavailable" class="analysis-unavailable hidden">当前没有可用于选点的二维窗口</div>
           <div id="profile-graph" class="graph-container"></div>
@@ -391,31 +407,34 @@
     </div><!-- end body-row -->
   </div>
 
-  <script src="/static/js/core/session-store.js?v=1"></script>
-  <script src="/static/js/core/panel-registry.js?v=2"></script>
+  <script src="/static/js/core/session-store.js?v=4"></script>
+  <script src="/static/js/core/panel-registry.js?v=4"></script>
   <script src="/static/js/core/variable-registry.js?v=1"></script>
   <script src="/static/js/core/api-client.js?v=1"></script>
+  <script src="/static/js/core/playback-cache.js?v=1"></script>
   <script src="/static/js/core/plotly-config.js?v=1"></script>
+  <script src="/static/js/core/ui-events.js?v=2"></script>
   <script src="/static/js/components/dual-range.js?v=1"></script>
-  <script src="/static/js/components/timeline.js?v=1"></script>
+  <script src="/static/js/components/timeline.js?v=4"></script>
   <script src="/static/js/components/panel-resizer.js?v=1"></script>
-  <script src="/static/js/components/panel-slot.js?v=1"></script>
+  <script src="/static/js/components/panel-slot.js?v=2"></script>
   <script src="/static/js/components/sidebar-controller.js?v=5"></script>
   <script src="/static/js/components/sidebar-sections.js?v=5"></script>
+  <script src="/static/js/features/controls/region-controls.js?v=4"></script>
   <script src="/static/js/interactions/map-selection.js?v=1"></script>
-  <script src="/static/js/features/dataset/upload-controller.js?v=4"></script>
-  <script src="/static/js/features/controls/range-controls.js?v=1"></script>
-  <script src="/static/js/features/controls/layer-visibility-controls.js?v=1"></script>
-  <script src="/static/js/features/controls/variable-controls.js?v=1"></script>
+  <script src="/static/js/features/dataset/upload-controller.js?v=5"></script>
+  <script src="/static/js/features/controls/range-controls.js?v=5"></script>
+  <script src="/static/js/features/controls/layer-visibility-controls.js?v=3"></script>
+  <script src="/static/js/features/controls/variable-controls.js?v=5"></script>
   <script src="/static/js/features/controls/visualization-controls.js?v=1"></script>
-  <script src="/static/js/features/controls/analysis-controls.js?v=1"></script>
-  <script src="/static/js/features/workspace/controller.js?v=1"></script>
-  <script src="/static/js/features/comparison/view.js?v=1"></script>
-  <script src="/static/js/features/volume/view.js?v=2"></script>
-  <script src="/static/js/features/layer/view.js?v=1"></script>
-  <script src="/static/js/features/profile/view.js?v=1"></script>
-  <script src="/static/js/features/transect/view.js?v=1"></script>
-  <script src="/static/js/features/workspace/panel-controller.js?v=2"></script>
-  <script src="/static/app.js?v=24"></script>
+  <script src="/static/js/features/controls/analysis-controls.js?v=3"></script>
+  <script src="/static/js/features/workspace/controller.js?v=6"></script>
+  <script src="/static/js/features/comparison/view.js?v=7"></script>
+  <script src="/static/js/features/volume/view.js?v=6"></script>
+  <script src="/static/js/features/layer/view.js?v=4"></script>
+  <script src="/static/js/features/profile/view.js?v=4"></script>
+  <script src="/static/js/features/transect/view.js?v=4"></script>
+  <script src="/static/js/features/workspace/panel-controller.js?v=6"></script>
+  <script src="/static/app.js?v=31"></script>
 </body>
 </html>

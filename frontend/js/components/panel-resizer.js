@@ -66,6 +66,10 @@ const PanelResizer = (() => {
     const resizer = document.getElementById("sidebar-resizer");
     const sidebar = document.querySelector(".sidebar");
     if (!resizer || !sidebar) return;
+    const widthKey = "pisces.sidebar.width.v2";
+    const savedWidth = Number(localStorage.getItem(widthKey));
+    sidebar.style.width = `${Number.isFinite(savedWidth)
+      ? Math.max(280, Math.min(380, savedWidth)) : 304}px`;
 
     resizer.addEventListener("mousedown", event => {
       event.preventDefault();
@@ -81,7 +85,7 @@ const PanelResizer = (() => {
         animationFrame = requestAnimationFrame(() => {
           animationFrame = null;
           const width = Math.max(
-            180, Math.min(480, startWidth + moveEvent.clientX - startX)
+            280, Math.min(380, startWidth + moveEvent.clientX - startX)
           );
           sidebar.style.width = `${width}px`;
         });
@@ -92,6 +96,10 @@ const PanelResizer = (() => {
         document.body.style.cursor = "";
         document.body.style.userSelect = "";
         sidebar.style.pointerEvents = "";
+        localStorage.setItem(
+          widthKey,
+          String(Math.round(sidebar.getBoundingClientRect().width))
+        );
         PanelSlot.resizeVisible();
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);

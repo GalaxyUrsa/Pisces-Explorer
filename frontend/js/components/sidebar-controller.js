@@ -18,11 +18,12 @@ const SidebarController = (() => {
   function positionToggle() {
     if (!sidebar || !toggle) return;
     const collapsed = sidebar.classList.contains("collapsed");
+    const rectangle = sidebar.getBoundingClientRect();
+    toggle.style.top = `${rectangle.top + 20}px`;
     if (window.innerWidth <= 760) {
       toggle.style.left = "18px";
       return;
     }
-    const rectangle = sidebar.getBoundingClientRect();
     if (collapsed) {
       toggle.style.left = `${
         rectangle.left + (rectangle.width - toggle.offsetWidth) / 2

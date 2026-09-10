@@ -15,7 +15,6 @@ const SidebarSections = (() => {
     colors: svgIcon("colors"),
     timeline: svgIcon("timeline"),
     depth: svgIcon("depth"),
-    "analysis-mode": svgIcon("analysis"),
     selection: svgIcon("selection"),
   };
   let activeFlyout = null;

@@ -12,6 +12,28 @@ from ...plotting.common import (
     variable_meta,
 )
 
+MAX_QUIVER_ARROWS = 2500
+
+
+def _resolve_quiver_step(u, v, requested_step: int, max_arrows: int):
+    requested_step = max(1, int(requested_step))
+    effective_step = requested_step
+    largest_dimension = max(u.shape[-2:])
+
+    while True:
+        sampled_u = u[::effective_step, ::effective_step]
+        sampled_v = v[::effective_step, ::effective_step]
+        magnitude = np.sqrt(sampled_u ** 2 + sampled_v ** 2)
+        valid = (
+            np.isfinite(sampled_u)
+            & np.isfinite(sampled_v)
+            & (magnitude > 0)
+        )
+        arrow_count = int(np.count_nonzero(valid))
+        if arrow_count <= max_arrows or effective_step >= largest_dimension:
+            return effective_step, arrow_count
+        effective_step += 1
+
 
 def make_quiver_trace(
     u,
@@ -20,8 +42,23 @@ def make_quiver_trace(
     lons,
     step: int = 20,
     scale_factor: float = 0.4,
+    metadata: dict | None = None,
+    max_arrows: int = MAX_QUIVER_ARROWS,
 ):
     """Build vectorized arrow traces over a heatmap."""
+    requested_step = max(1, int(step))
+    step, arrow_count = _resolve_quiver_step(
+        u, v, requested_step, max_arrows
+    )
+    if metadata is not None:
+        metadata.update(
+            {
+                "requested_step": requested_step,
+                "effective_step": step,
+                "arrow_count": arrow_count,
+                "max_arrows": max_arrows,
+            }
+        )
     sampled_lats = lats[::step]
     sampled_lons = lons[::step]
     sampled_u = u[::step, ::step]
@@ -39,17 +76,17 @@ def make_quiver_trace(
     )
     scale = min(latitude_step, longitude_step) * scale_factor
     magnitude = np.sqrt(sampled_u ** 2 + sampled_v ** 2)
-    max_magnitude = float(np.nanmax(magnitude))
-    if max_magnitude == 0 or np.isnan(max_magnitude):
+    valid = (
+        np.isfinite(sampled_u)
+        & np.isfinite(sampled_v)
+        & (magnitude > 0)
+    )
+    if not np.any(valid):
         return None
+    max_magnitude = float(np.max(magnitude[valid]))
 
     longitude_grid, latitude_grid = np.meshgrid(
         sampled_lons, sampled_lats
-    )
-    valid = ~(
-        np.isnan(sampled_u)
-        | np.isnan(sampled_v)
-        | (magnitude == 0)
     )
     longitude_start = longitude_grid[valid]
     latitude_start = latitude_grid[valid]
@@ -116,7 +153,10 @@ def make_layer_fig(
     colorscale: str = None,
     colorscale_custom: list = None,
     quiver_uv: tuple = None,
+    quiver_metadata: dict | None = None,
     is_2d: bool = False,
+    plot_step: int = 2,
+    json_safe_nan: bool = False,
 ) -> dict:
     meta = variable_meta(variable)
     if colorscale_custom and len(colorscale_custom) == 2:
@@ -130,8 +170,12 @@ def make_layer_fig(
     vmax = vmax if vmax is not None else float(np.nanmax(data))
     full_layer = data if is_2d or data.ndim == 2 else data[depth_idx]
 
-    step = 2
+    step = plot_step
     plotted_layer = full_layer[::step, ::step]
+    if json_safe_nan:
+        # Starlette's strict JSON encoder rejects NaN. Plotly renders None as
+        # a transparent cell, preserving Region's land mask.
+        plotted_layer = np.where(np.isfinite(plotted_layer), plotted_layer, None)
     plotted_lats = lats[::step]
     plotted_lons = lons[::step]
 
@@ -164,6 +208,7 @@ def make_layer_fig(
             lons,
             quiver_step,
             scale_factor=scale_factor,
+            metadata=quiver_metadata,
         )
         if traces is not None:
             figure.add_trace(traces[0])
@@ -183,6 +228,7 @@ def make_layer_fig(
                 text=[f"P{index + 1}" for index in range(len(points))],
                 textposition="top right",
                 textfont={"color": "white", "size": 11},
+                meta={"role": "selection-points"},
                 showlegend=False,
                 hoverinfo="skip",
             )
@@ -198,6 +244,7 @@ def make_layer_fig(
                         "width": 2,
                         "dash": "dash",
                     },
+                    meta={"role": "selection-line"},
                     showlegend=False,
                     hoverinfo="skip",
                 )
@@ -220,4 +267,3 @@ def make_layer_fig(
         },
     )
     return figure_to_dict(figure)
-

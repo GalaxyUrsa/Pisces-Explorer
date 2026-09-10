@@ -7,6 +7,8 @@ import re
 import numpy as np
 import xarray as xr
 
+from .core.spatial import parse_region
+
 
 def sound_speed_chen_millero(T, S, z):
     """UNESCO / Chen-Millero (1977) sound speed formula."""
@@ -72,6 +74,16 @@ def _load_optional_2d(ds, name, shape_2d):
     return np.full(shape_2d, np.nan)
 
 
+def _load_derived_3d(ds, name, shape_3d):
+    if name not in ds:
+        return None
+    value = ds[name]
+    if "time" in value.dims:
+        value = value.isel(time=0)
+    values = value.values.astype(float)
+    return values if values.shape == shape_3d else None
+
+
 def _compute_ss(T, S, depths):
     z = depths[:, np.newaxis, np.newaxis] * np.ones_like(T)
     return sound_speed_chen_millero(T, S, z)
@@ -84,37 +96,66 @@ def load_sound_speed(nc_dir: str, date_str: str):
     return load_from_path(pred_path)
 
 
-def load_from_path(path: str) -> dict:
+def _subset_region(ds, region):
+    bounds = parse_region(region)
+    if bounds is None:
+        return ds
+    lon_min, lon_max, lat_min, lat_max = bounds
+    lats = np.asarray(ds["latitude"].values)
+    lons = np.asarray(ds["longitude"].values)
+    lat_indices = np.flatnonzero((lats >= lat_min) & (lats <= lat_max))
+    lon_indices = np.flatnonzero((lons >= lon_min) & (lons <= lon_max))
+    if len(lat_indices) < 2 or len(lon_indices) < 2:
+        raise ValueError("指定区域与数据没有足够交集，至少需要 2 × 2 个网格点")
+    return ds.isel(
+        latitude=slice(lat_indices[0], lat_indices[-1] + 1),
+        longitude=slice(lon_indices[0], lon_indices[-1] + 1),
+    )
+
+
+def load_from_path(path: str, region=None) -> dict:
     """Load from an arbitrary .nc file path. Returns a dict of all variables."""
-    ds = xr.open_dataset(path)
-    T, S, lats, lons, depths = _load_nc(ds)
-    shape_3d = T.shape
-    shape_2d = (len(lats), len(lons))
-    ss = _compute_ss(T, S, depths)
-    result = {
-        "ss":    ss,
-        "temp":  T,
-        "salt":  S,
-        "uo":    _load_optional_3d(ds, "uo",    shape_3d),
-        "vo":    _load_optional_3d(ds, "vo",    shape_3d),
-        "u10":   _load_optional_2d(ds, "u10",   shape_2d),
-        "v10":   _load_optional_2d(ds, "v10",   shape_2d),
-        "swh":   _load_optional_2d(ds, "swh",   shape_2d),
-        "mwd_u": _load_optional_2d(ds, "mwd_u", shape_2d),
-        "mwd_v": _load_optional_2d(ds, "mwd_v", shape_2d),
-        "lats":   lats,
-        "lons":   lons,
-        "depths": depths,
-    }
-    ds.close()
-    return result
+    with xr.open_dataset(path) as source:
+        ds = _subset_region(source, region)
+        T, S, lats, lons, depths = _load_nc(ds)
+        shape_3d = T.shape
+        shape_2d = (len(lats), len(lons))
+        ss = _compute_ss(T, S, depths)
+        uo = _load_optional_3d(ds, "uo", shape_3d)
+        vo = _load_optional_3d(ds, "vo", shape_3d)
+        current_speed = _load_derived_3d(ds, "current_speed", shape_3d)
+        if current_speed is None:
+            current_speed = np.hypot(uo, vo)
+        current_direction = _load_derived_3d(
+            ds, "current_direction", shape_3d
+        )
+        if current_direction is None:
+            current_direction = (
+                np.degrees(np.arctan2(uo, vo)) + 360.0
+            ) % 360.0
+            current_direction = np.where(
+                np.isfinite(current_speed) & (current_speed > 0),
+                current_direction,
+                np.nan,
+            )
+        return {
+            "ss": ss, "temp": T, "salt": S, "uo": uo, "vo": vo,
+            "current_speed": current_speed,
+            "current_direction": current_direction,
+            "u10": _load_optional_2d(ds, "u10", shape_2d),
+            "v10": _load_optional_2d(ds, "v10", shape_2d),
+            "swh": _load_optional_2d(ds, "swh", shape_2d),
+            "mwd_u": _load_optional_2d(ds, "mwd_u", shape_2d),
+            "mwd_v": _load_optional_2d(ds, "mwd_v", shape_2d),
+            "lats": lats, "lons": lons, "depths": depths,
+        }
 
 
 def nearest_idx(arr, val):
     return int(np.argmin(np.abs(arr - val)))
 
 
-def load_series(items: list) -> list[dict]:
+def load_series(items: list, region=None) -> list[dict]:
     """Load multiple NC files. items can be file paths or (path, display_name) tuples."""
     frames = []
     for item in items:
@@ -127,7 +168,7 @@ def load_series(items: list) -> list[dict]:
             raise ValueError(f"No date found in filename: {display_name}")
         date_str = date_match.group(1)
         try:
-            frame = load_from_path(path)
+            frame = load_from_path(path, region)
             frame["date"] = date_str
             frame["filename"] = os.path.basename(display_name)
             frames.append(frame)

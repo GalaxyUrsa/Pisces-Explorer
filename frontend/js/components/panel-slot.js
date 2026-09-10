@@ -11,6 +11,8 @@ const PanelSlot = (() => {
       select: root.querySelector(".slot-view-select"),
       loading: root.querySelector(".slot-loading"),
       error: root.querySelector(".slot-error"),
+      close: root.querySelector(".slot-close"),
+      openOther: root.querySelector(".slot-open-other"),
     };
   }
 

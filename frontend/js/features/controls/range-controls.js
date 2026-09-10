@@ -10,12 +10,12 @@ const RangeControls = (() => {
     input(id).value = value ?? "";
   }
 
-  async function save(apiFetch, configuration) {
+  async function save(apiFetch) {
     try {
       await apiFetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(configuration),
+        body: JSON.stringify(SessionStore.serializeConfiguration()),
       });
     } catch {
       // Keep local controls usable when persistence is unavailable.
@@ -23,48 +23,29 @@ const RangeControls = (() => {
   }
 
   async function loadConfiguration(state, apiFetch, defaults) {
-    const variables = Object.keys(defaults);
+    if (state.configLoaded) return;
     try {
       const saved = await apiFetch("/api/config");
-      variables.forEach(variable => {
-        state.varConfig[variable] = {
-          ...defaults[variable],
-          ...(saved[variable] || {}),
-        };
-      });
-      if (Array.isArray(saved.visible_layers)) {
-        state.varConfig.visible_layers = saved.visible_layers;
-      }
+      SessionStore.applyConfiguration(saved, defaults, state.meta);
     } catch {
-      variables.forEach(variable => {
-        state.varConfig[variable] = { ...defaults[variable] };
-      });
+      SessionStore.applyConfiguration({}, defaults, state.meta);
     }
   }
 
-  function syncInputs(configuration) {
+  function syncInputs(configuration, defaultConfiguration) {
     setValue("cmin", "");
     setValue("cmax", "");
-    if (configuration.color_min && configuration.color_max) {
-      setValue("colorscale-select", "");
-      setValue("color-min-swatch", configuration.color_min);
-      setValue("color-min-hex", configuration.color_min);
-      setValue("color-max-swatch", configuration.color_max);
-      setValue("color-max-hex", configuration.color_max);
-    } else {
-      setValue("colorscale-select", configuration.colorscale || "");
-      setValue("color-min-hex", "");
-      setValue("color-max-hex", "");
-      setValue("color-min-swatch", "#000000");
-      setValue("color-max-swatch", "#000000");
-    }
+    setValue(
+      "colorscale-select",
+      configuration.colorscale || defaultConfiguration.colorscale || ""
+    );
     setValue("depth-min", configuration.depth_min);
     setValue("depth-max", configuration.depth_max);
     setValue("speed-min", configuration.value_min);
     setValue("speed-max", configuration.value_max);
   }
 
-  function initializeColorInputs(colorscales, listenerOptions) {
+  function initializeColorscaleSelect(colorscales) {
     const select = input("colorscale-select");
     select.innerHTML = "";
     colorscales.forEach(name => {
@@ -74,26 +55,6 @@ const RangeControls = (() => {
       select.appendChild(option);
     });
 
-    function link(swatchId, hexId) {
-      input(swatchId).addEventListener("input", () => {
-        input(hexId).value = input(swatchId).value;
-        select.value = "";
-      }, listenerOptions);
-      input(hexId).addEventListener("input", () => {
-        if (/^#[0-9a-fA-F]{6}$/.test(input(hexId).value)) {
-          input(swatchId).value = input(hexId).value;
-          select.value = "";
-        }
-      }, listenerOptions);
-    }
-    link("color-min-swatch", "color-min-hex");
-    link("color-max-swatch", "color-max-hex");
-    select.addEventListener("change", () => {
-      setValue("color-min-hex", "");
-      setValue("color-max-hex", "");
-      setValue("color-min-swatch", "#000000");
-      setValue("color-max-swatch", "#000000");
-    }, listenerOptions);
     return select;
   }
 
@@ -110,9 +71,7 @@ const RangeControls = (() => {
     eventController = new AbortController();
     const listenerOptions = { signal: eventController.signal };
     await loadConfiguration(state, apiFetch, defaults);
-    const colorscaleSelect = initializeColorInputs(
-      colorscales, listenerOptions
-    );
+    const colorscaleSelect = initializeColorscaleSelect(colorscales);
 
     const depthLow = state.meta.depths[0];
     const depthHigh = state.meta.depths[state.meta.depths.length - 1];
@@ -165,7 +124,7 @@ const RangeControls = (() => {
           ? [configuration.value_min, configuration.value_max]
           : null
       );
-      syncInputs(configuration);
+      syncInputs(configuration, defaults[variable]);
       colorbar.setBounds(variableRange.min, variableRange.max);
       colorbar.setRange(configuration.min, configuration.max);
       value.setBounds(variableRange.min, variableRange.max);
@@ -184,6 +143,7 @@ const RangeControls = (() => {
     }
 
     input("range-apply-btn").onclick = async () => {
+      TimelineController.stop();
       const depthMin = Number.parseFloat(input("depth-min").value);
       const depthMax = Number.parseFloat(input("depth-max").value);
       const valueMin = Number.parseFloat(input("speed-min").value);
@@ -203,40 +163,58 @@ const RangeControls = (() => {
       configuration.depth_max = state.depthRange ? depthMax : null;
       configuration.value_min = state.valueRange ? valueMin : null;
       configuration.value_max = state.valueRange ? valueMax : null;
-      await save(apiFetch, state.varConfig);
+      if (state.linked3d2d) {
+        SessionStore.syncLinked(
+          state.activeAnalysisSlot,
+          ["depthRange", "valueRange", "varConfig"]
+        );
+      }
+      await save(apiFetch);
       renderProfile();
     };
 
     input("cbar-apply").onclick = async () => {
+      TimelineController.stop();
       const minimum = Number.parseFloat(input("cmin").value);
       const maximum = Number.parseFloat(input("cmax").value);
       if (Number.isNaN(minimum) || Number.isNaN(maximum)) return;
-      const minHex = input("color-min-hex").value.trim();
-      const maxHex = input("color-max-hex").value.trim();
-      const custom = (
-        /^#[0-9a-fA-F]{6}$/.test(minHex)
-        && /^#[0-9a-fA-F]{6}$/.test(maxHex)
-      );
       state.varConfig[state.variable] = {
         ...state.varConfig[state.variable],
         min: minimum,
         max: maximum,
-        colorscale: custom
-          ? null
-          : (
-            colorscaleSelect.value
-            || defaults[state.variable].colorscale
-          ),
-        color_min: custom ? minHex : null,
-        color_max: custom ? maxHex : null,
+        colorscale: (
+          colorscaleSelect.value
+          || defaults[state.variable].colorscale
+        ),
+        color_min: null,
+        color_max: null,
       };
       state.colorRange = [minimum, maximum];
       colorbar.setRange(minimum, maximum);
-      await save(apiFetch, state.varConfig);
-      renderVolume();
-      renderLayer(state.depthIdx, state.points);
-      renderProfile();
+      if (state.linked3d2d) SessionStore.syncLinked(state.activeAnalysisSlot);
+      await save(apiFetch);
+      PiscesUIEvents.panel(state);
+      if (state.linked3d2d) await PanelController.renderAll();
+      else await renderLayer(state.depthIdx, state.points);
+      await renderProfile();
     };
+
+    colorscaleSelect.addEventListener("change", async () => {
+      TimelineController.stop();
+      state.varConfig[state.variable] = {
+        ...state.varConfig[state.variable],
+        colorscale: (
+          colorscaleSelect.value
+          || defaults[state.variable].colorscale
+        ),
+      };
+      if (state.linked3d2d) SessionStore.syncLinked(state.activeAnalysisSlot);
+      await save(apiFetch);
+      PiscesUIEvents.panel(state);
+      if (state.linked3d2d) await PanelController.renderAll();
+      else await renderLayer(state.depthIdx, state.points);
+      await renderProfile();
+    }, listenerOptions);
 
     selectVariable(state.variable, true);
     return { selectVariable };
@@ -244,4 +222,3 @@ const RangeControls = (() => {
 
   return { initialize, save };
 })();
-

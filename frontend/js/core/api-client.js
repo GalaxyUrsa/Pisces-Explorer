@@ -1,7 +1,12 @@
 /** Shared JSON API client with structured errors. */
 const ApiClient = (() => {
+  function scopedUrl(url) {
+    const prefix = window.PISCES_API_PREFIX || "";
+    return prefix && url.startsWith("/api/") ? `${prefix}${url}` : url;
+  }
+
   async function fetchJson(url, options = {}) {
-    const response = await fetch(url, options);
+    const response = await fetch(scopedUrl(url), options);
     if (!response.ok) {
       const text = await response.text();
       let detail = text;
@@ -13,7 +18,15 @@ const ApiClient = (() => {
       error.detail = detail;
       throw error;
     }
-    return response.json();
+    const result = await response.json();
+    if (
+      window.PISCES_API_PREFIX === "/region"
+      && options.method === "DELETE"
+      && url === "/api/session"
+    ) {
+      document.dispatchEvent(new CustomEvent("pisces:region-session-cleared"));
+    }
+    return result;
   }
 
   return { fetchJson };

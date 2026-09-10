@@ -2,18 +2,17 @@
 
 import json
 import os
-import sys
+
+from .core.paths import REGION_VISUALIZATION_CONFIG_PATH, VISUALIZATION_CONFIG_PATH
+from .core.runtime import current_runtime_scope
 
 
-def _app_dir() -> str:
-    """Return the directory next to the exe (frozen) or the project root (dev)."""
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    # dev: backend/config.py → go up one level to project root
-    return os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+CONFIG_PATH = str(VISUALIZATION_CONFIG_PATH)
+REGION_CONFIG_PATH = str(REGION_VISUALIZATION_CONFIG_PATH)
 
 
-CONFIG_PATH = os.path.join(_app_dir(), "temp", "viz_config.json")
+def _config_path() -> str:
+    return REGION_CONFIG_PATH if current_runtime_scope() == "region" else CONFIG_PATH
 
 DEFAULTS: dict = {
     "ss":    {"min": 1480, "max": 1560, "colorscale": "Viridis",  "color_min": None, "color_max": None, "depth_min": None, "depth_max": None, "value_min": None, "value_max": None},
@@ -35,7 +34,7 @@ DEFAULTS: dict = {
 def load_config() -> dict:
     """Return saved config merged with DEFAULTS. Falls back to DEFAULTS on any error."""
     try:
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(_config_path(), "r", encoding="utf-8") as f:
             saved = json.load(f)
         result = {}
         for var, defaults in DEFAULTS.items():
@@ -43,13 +42,29 @@ def load_config() -> dict:
             result[var] = {**defaults, **{k: v for k, v in entry.items() if k in defaults}}
         if "visible_layers" in saved:
             result["visible_layers"] = saved["visible_layers"]
+        if isinstance(saved.get("workspace"), dict):
+            result["workspace"] = saved["workspace"]
+        region = saved.get("region")
+        if (
+            region is None
+            or (
+                isinstance(region, list)
+                and len(region) == 4
+                and all(isinstance(value, (int, float)) for value in region)
+            )
+        ):
+            result["region"] = region
         return result
     except Exception:
-        return {v: dict(d) for v, d in DEFAULTS.items()}
+        return {
+            **{variable: dict(defaults) for variable, defaults in DEFAULTS.items()},
+            "region": None,
+        }
 
 
 def save_config(cfg: dict) -> None:
-    """Write cfg to CONFIG_PATH, creating ./temp/ if needed."""
-    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+    """Write cfg to the Pisces-Hub configuration directory."""
+    path = _config_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)

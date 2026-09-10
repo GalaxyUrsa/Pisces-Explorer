@@ -1,5 +1,41 @@
 /** 3D volume feature view. */
 const VolumeView = (() => {
+  function signature(url) {
+    const parsed = new URL(url, window.location.origin);
+    parsed.searchParams.delete("date_idx");
+    return `${parsed.pathname}?${parsed.searchParams.toString()}`;
+  }
+
+  async function draw(graph, figure, plotConfig, requestSignature, slotId) {
+    const reusable = (
+      graph.dataset.volumeSignature === requestSignature
+      && graph.data?.length === figure.data.length
+      && figure.data.every((trace, index) => (
+        trace.type === "surface" && graph.data[index]?.type === "surface"
+      ))
+    );
+    if (reusable) {
+      for (let index = 0; index < figure.data.length; index += 1) {
+        const trace = figure.data[index];
+        await Plotly.restyle(graph, {
+          z: [trace.z],
+          surfacecolor: [trace.surfacecolor],
+          cmin: trace.cmin,
+          cmax: trace.cmax,
+          colorscale: [trace.colorscale],
+          hovertemplate: trace.hovertemplate,
+        }, [index]);
+      }
+      return;
+    }
+    const camera = graph._fullLayout?.scene?.camera;
+    if (graph.data || graph._fullLayout) Plotly.purge(graph);
+    figure.layout.uirevision = `volume-${slotId}`;
+    if (camera && figure.layout.scene) figure.layout.scene.camera = camera;
+    await Plotly.react(graph, figure.data, figure.layout, plotConfig);
+    graph.dataset.volumeSignature = requestSignature;
+  }
+
   function selectedLayers(state) {
     return state.visibleLayers
       ? state.visibleLayers
@@ -47,6 +83,35 @@ const VolumeView = (() => {
       const layers = selectedLayers(state);
       if (layers.length) params.set("layers", layers.join(","));
     }
+    RegionControls.appendQuery(params, state.region);
+  }
+
+  function requestUrl(
+    state,
+    dateIndex = state.dateIdx,
+    quality = state.playing ? "preview" : "full",
+  ) {
+    const params = new URLSearchParams({ variable: state.variable });
+    appendDisplayParams(state, params);
+    if (state.isSeries) params.set("date_idx", dateIndex);
+    params.set("quality", quality);
+    return `/api/volume?${params}`;
+  }
+
+  function comparisonRequestUrl(
+    state,
+    source,
+    dateIndex = state.dateIdx,
+    quality = state.playing ? "preview" : "full",
+  ) {
+    const params = new URLSearchParams({
+      variable: state.variable,
+      comparison_source: source,
+      date_idx: dateIndex,
+    });
+    appendDisplayParams(state, params);
+    params.set("quality", quality);
+    return `/api/comparison/volume?${params}`;
   }
 
   async function render({
@@ -54,13 +119,10 @@ const VolumeView = (() => {
   }) {
     if (state.varType === "2d" || state.isComparison) return false;
     try {
-      const params = new URLSearchParams({ variable: state.variable });
-      appendDisplayParams(state, params);
-      if (state.isSeries) params.set("date_idx", state.dateIdx);
-
-      const figure = await fetchJson(`/api/volume?${params}`);
+      const url = requestUrl(state);
+      const figure = await fetchJson(url);
       if (renderVersion !== state.panelRenderVersions[slot.id]) return false;
-      await Plotly.react(slot.graph, figure.data, figure.layout, plotConfig);
+      await draw(slot.graph, figure, plotConfig, signature(url), slot.id);
 
       const graph = slot.graph;
       attachDepthSelection(state, graph, onDepthChange);
@@ -74,19 +136,11 @@ const VolumeView = (() => {
     state, slot, source, fetchJson, plotConfig,
     onDepthChange, renderVersion,
   }) {
-    const params = new URLSearchParams({
-      variable: state.variable,
-      comparison_source: source,
-      date_idx: state.dateIdx,
-    });
-    appendDisplayParams(state, params);
-    const result = await fetchJson(`/api/comparison/volume?${params}`);
+    const url = comparisonRequestUrl(state, source);
+    const result = await fetchJson(url);
     if (renderVersion !== state.panelRenderVersions[slot.id]) return false;
-    await Plotly.react(
-      slot.graph,
-      result.figure.data,
-      result.figure.layout,
-      plotConfig
+    await draw(
+      slot.graph, result.figure, plotConfig, signature(url), slot.id
     );
     slot.title.textContent = result.title;
     slot.source.textContent = source === "difference"
@@ -98,5 +152,10 @@ const VolumeView = (() => {
     return true;
   }
 
-  return { render, renderComparison };
+  return {
+    render,
+    renderComparison,
+    requestUrl,
+    comparisonRequestUrl,
+  };
 })();

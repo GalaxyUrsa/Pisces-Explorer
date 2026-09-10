@@ -6,6 +6,7 @@ const PanelRegistry = (() => {
       modes: ["single", "series"],
       requires3d: true,
       selectable: false,
+      volume: true,
       emptyMessage: "当前变量不支持三维显示",
     },
     layer2d: {
@@ -66,35 +67,38 @@ const PanelRegistry = (() => {
     return state.isSeries ? "series" : "single";
   }
 
-  function available(state) {
+  function available(state, slotId = null) {
     const currentMode = mode(state);
     return Object.entries(definitions).filter(([, definition]) => (
       definition.modes.includes(currentMode)
       && (!definition.requires3d || state.varType === "3d")
+      && (!state.linked3d2d || !slotId
+        || (slotId === "left" ? definition.volume : !definition.volume))
     ));
   }
 
   function initializeSlots(state) {
-    state.panelSlots = state.isComparison
-      ? {
-        left: { viewType: "comparisonA" },
-        right: { viewType: "comparisonB" },
-      }
-      : {
-        left: { viewType: state.varType === "3d" ? "volume3d" : "layer2d" },
-        right: { viewType: "layer2d" },
-      };
-    state.activeAnalysisSlot = state.isComparison ? "left" : "right";
+    if (state.isComparison && !state.linked3d2d) {
+      state.panelSlots.left.viewType = "comparisonA";
+      state.panelSlots.right.viewType = "comparisonB";
+      state.activeAnalysisSlot = state.panelSlots.left.enabled ? "left" : "right";
+    }
     state.panelRenderVersions = { left: 0, right: 0 };
   }
 
   function reconcile(state) {
-    const allowed = new Set(available(state).map(([key]) => key));
-    const fallback = available(state)[0]?.[0] || null;
     ["left", "right"].forEach(slotId => {
+      const panelState = SessionStore.forPanel(slotId);
+      const choices = available(panelState, slotId);
+      const allowed = new Set(choices.map(([key]) => key));
+      const fallback = choices[0]?.[0] || null;
       if (!allowed.has(state.panelSlots[slotId].viewType)) {
         state.panelSlots[slotId].viewType = fallback;
       }
+      if (
+        definitions[state.panelSlots[slotId].viewType]?.requires3d
+        && panelState.varType !== "3d"
+      ) state.panelSlots[slotId].viewType = fallback;
     });
   }
 

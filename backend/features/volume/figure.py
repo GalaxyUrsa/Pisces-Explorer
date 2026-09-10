@@ -25,6 +25,8 @@ def make_volume_fig(
     colorscale: str = None,
     colorscale_custom: list = None,
     depth_indices: list = None,
+    sample_step: int = 8,
+    max_depth_layers: int | None = None,
 ) -> dict:
     meta = variable_meta(variable)
     depth_count = len(depths)
@@ -46,8 +48,13 @@ def make_volume_fig(
         ]
     if not depth_indices:
         depth_indices = [0]
+    if max_depth_layers and len(depth_indices) > max_depth_layers:
+        positions = np.linspace(
+            0, len(depth_indices) - 1, max_depth_layers, dtype=int
+        )
+        depth_indices = [depth_indices[position] for position in positions]
 
-    step = 8
+    step = max(1, int(sample_step))
     sampled_data = data[:, ::step, ::step]
     sampled_lats = lats[::step]
     sampled_lons = lons[::step]
@@ -65,6 +72,7 @@ def make_volume_fig(
         plotted_layer = apply_sentinel(layer, sentinel, vmin, vmax)
         figure.add_trace(
             go.Surface(
+                uid=f"volume-layer-{index}",
                 x=longitude_grid,
                 y=latitude_grid,
                 z=z_values,
@@ -127,4 +135,3 @@ def make_volume_fig(
         legend={"visible": False},
     )
     return figure_to_dict(figure)
-

@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 
 from ...core.runtime import runtime
+from ...core.spatial import point_in_region
 from ...core.variables import VARS_3D
 from ..comparison.service import resolve_analysis_data
 from .figure import make_transect_fig
@@ -23,6 +24,17 @@ def get_transect(request: TransectRequest):
         runtime,
         request.variable, request.date_idx, request.comparison_source
     )
+    try:
+        inside = all(
+            point_in_region(point.lat, point.lon, request.region)
+            for point in (request.p1, request.p2)
+        )
+    except (ValueError, TypeError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if not inside:
+        raise HTTPException(
+            status_code=400, detail="transect point is outside region"
+        )
     depths = frame["depths"]
     if not 0 <= request.depth_idx < len(depths):
         raise HTTPException(status_code=400, detail="depth_idx out of range")
